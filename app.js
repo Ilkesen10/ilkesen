@@ -269,15 +269,17 @@ window.IlkeSendika = (function(){
   // (duplicate removed)
 
   function initMobileSubmenus(){
-    // Toggle submenus on small screens by tapping the parent link
+    // Toggle submenus on small screens by tapping the parent li
     const width = () => window.innerWidth || document.documentElement.clientWidth;
-    qsa('#navMenu > li.has-sub > a').forEach(anchor => {
-      anchor.addEventListener('click', (e) => {
+    qsa('#navMenu > li.has-sub').forEach(li => {
+      li.addEventListener('click', (e) => {
         if (width() <= 768) {
+          // Allow clicks on actual links inside to proceed
+          if (e.target.tagName === 'A' && e.target.href) return;
           e.preventDefault();
-          const li = anchor.parentElement;
           const isOpen = li.classList.toggle('open');
-          anchor.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+          const anchor = li.querySelector('a');
+          if (anchor) anchor.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         }
       });
     });
