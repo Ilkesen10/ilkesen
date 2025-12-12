@@ -268,20 +268,26 @@ window.IlkeSendika = (function(){
 
   // (duplicate removed)
 
-  function initMobileSubmenus(){
-    // Toggle submenus on small screens by tapping the parent li
+  function initMobileSubmenus() {
+    // Toggle submenus on small screens by tapping the parent link
     const width = () => window.innerWidth || document.documentElement.clientWidth;
-    qsa('#navMenu > li.has-sub').forEach(li => {
-      li.addEventListener('click', (e) => {
+    
+    qsa('#navMenu > li.has-sub > a').forEach(anchor => {
+      // Use a named function to be able to remove it later if needed
+      const handleSubmenuToggle = (e) => {
         if (width() <= 768) {
-          // Allow clicks on actual links inside to proceed
-          if (e.target.tagName === 'A' && e.target.href) return;
+          // On mobile, this link's only job is to open the submenu.
           e.preventDefault();
-          const isOpen = li.classList.toggle('open');
-          const anchor = li.querySelector('a');
-          if (anchor) anchor.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+          const li = anchor.parentElement;
+          if (li) {
+            const isOpen = li.classList.toggle('open');
+            anchor.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+          }
         }
-      });
+      };
+      
+      // Add the event listener
+      anchor.addEventListener('click', handleSubmenuToggle);
     });
   }
 
