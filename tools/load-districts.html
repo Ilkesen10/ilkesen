@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>İl / İlçe Yükleyici</title>
+  <link rel="stylesheet" href="../styles.css" />
+  <script src="../vendor/supabase/supabase.js"></script>
+  <script src="../supabase-config.js"></script>
+</head>
+<body class="container" style="padding:24px 16px">
+  <h1>İl / İlçe Yükleyici</h1>
+  <p class="muted">Aşağıdaki seçeneklerden biriyle tüm ilçeleri tek seferde yükleyin.</p>
+  <ol>
+    <li><strong>Yerel JSON'u yükle</strong>: proje içindeki <code>data/districts_tr.json</code> dosyasını içeri aktarır.</li>
+    <li><strong>Dosya seç</strong>: kendi JSON dosyanızı seçip yükleyin (format: { "Ankara": ["Çankaya",...], ... }).</li>
+  </ol>
+
+  <div class="card" style="display:grid;gap:10px;max-width:760px">
+    <div>
+      <button id="btnLoadFromProject" class="btn btn-primary">Projedeki JSON'dan Yükle</button>
+      <span id="statusProject" class="muted"></span>
+    </div>
+    <div>
+      <input type="file" id="fileInput" accept="application/json" />
+      <button id="btnLoadFromFile" class="btn btn-outline">Seçili Dosyayı Yükle</button>
+      <span id="statusFile" class="muted"></span>
+    </div>
+    <div>
+      <label style="display:grid;gap:6px">
+        <span>Resmî Liste URL'si (TÜİK/NVI ile uyumlu bir JSON kaynağı)</span>
+        <input type="url" id="officialUrl" placeholder="https://raw.githubusercontent.com/.../turkiye-il-ilce.json" />
+      </label>
+      <button id="btnLoadFromUrl" class="btn btn-outline">Resmî Listeden Yükle</button>
+      <span id="statusUrl" class="muted"></span>
+      <div class="muted">Not: Farklı JSON şemaları otomatik olarak normalize edilir (il/ilçe isimlerine dönüştürülür).</div>
+    </div>
+  </div>
+
+  <script src="load-districts.js" defer></script>
+</body>
+</html>

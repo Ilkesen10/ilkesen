@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com;" />
+  <title>QR Oluşturucu | Üyelik Doğrulama</title>
+  <link rel="stylesheet" href="../styles.css" />
+  <style>
+    body{ background:#f8fafc; }
+    .wrap{ max-width:760px; margin:32px auto; padding:0 16px; }
+    .form{ background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; }
+    .row{ display:grid; grid-template-columns:160px 1fr; gap:10px; align-items:center; margin:8px 0; }
+    .row input,.row select{ padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; }
+    .preview{ margin-top:16px; display:flex; gap:16px; align-items:flex-start; }
+    .preview img{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:8px; }
+    .muted{ color:#64748b; font-size:14px; }
+    .btns{ display:flex; gap:10px; margin-top:10px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Üyelik QR Oluşturucu</h1>
+    <p class="muted">Kart üstüne basmak için doğrulama URL’si içeren QR kod üretin. QR okutulunca <code>verify.html</code> sayfası açılır ve üye doğrulanır.</p>
+    <div class="form">
+      <div class="row">
+        <label for="base">Site URL</label>
+        <input id="base" type="url" placeholder="https://sizin-domeniniz/verify.html" />
+      </div>
+      <div class="row">
+        <label for="token">Doğrulama Kodu</label>
+        <input id="token" type="text" placeholder="ör. 1ce3d9b0-..." />
+      </div>
+      <div class="row">
+        <label for="size">Boyut</label>
+        <select id="size">
+          <option value="256">256 px</option>
+          <option value="300" selected>300 px</option>
+          <option value="512">512 px</option>
+        </select>
+      </div>
+      <div class="btns">
+        <button id="gen" class="btn btn-primary" type="button">QR Oluştur</button>
+        <button id="dl" class="btn btn-outline" type="button" disabled>PNG İndir</button>
+      </div>
+      <div class="preview">
+        <img id="qr" alt="QR Önizleme" width="300" height="300" hidden />
+        <div>
+          <div class="muted">Doğrulama URL</div>
+          <div id="outUrl" style="word-break:break-all"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const $ = (s)=> document.querySelector(s);
+    const base = $('#base');
+    const token = $('#token');
+    const size = $('#size');
+    const gen = $('#gen');
+    const dl = $('#dl');
+    const img = $('#qr');
+    const outUrl = $('#outUrl');
+
+    // Defaults
+    try{
+      const guess = location.origin + (location.pathname.includes('/tools/') ? '/verify.html' : '/verify.html');
+      base.value = guess;
+    }catch{}
+
+    function buildVerifyUrl(){
+      const b = String(base.value||'').trim().replace(/\/$/, '');
+      const t = String(token.value||'').trim();
+      if (!b || !t) return '';
+      const u = new URL(b);
+      if (!/verify\.html$/i.test(u.pathname)) u.pathname = u.pathname.replace(/\/$/, '') + '/verify.html';
+      u.searchParams.set('t', t);
+      return u.toString();
+    }
+
+    function buildQrSrc(text, px){
+      const chl = encodeURIComponent(text);
+      const s = Number(px)||300;
+      return `https://chart.googleapis.com/chart?chs=${s}x${s}&cht=qr&chl=${chl}&choe=UTF-8&chld=L|0`;
+    }
+
+    gen.addEventListener('click', ()=>{
+      const vUrl = buildVerifyUrl();
+      if (!vUrl){ alert('Site URL ve Doğrulama Kodu gerekli'); return; }
+      outUrl.textContent = vUrl;
+      const src = buildQrSrc(vUrl, size.value);
+      img.width = img.height = Number(size.value)||300;
+      img.src = src;
+      img.hidden = false;
+      dl.disabled = false;
+      dl.onclick = async ()=>{
+        try{
+          const r = await fetch(src, { cache:'no-store' });
+          const b = await r.blob();
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(b);
+          a.download = 'membership-qr.png';
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(()=> URL.revokeObjectURL(a.href), 1000);
+        }catch(e){ alert('İndirilemedi: '+ (e?.message||e)); }
+      };
+    });
+  </script>
+</body>
+</html>

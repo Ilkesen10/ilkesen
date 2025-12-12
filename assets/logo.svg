@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">İlke Sendika Logosu</title>
+  <desc id="desc">Teal renkli kalkan içinde stilize I harfi</desc>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+    <filter id="s" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f766e" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <g filter="url(#s)">
+    <path d="M64 8L108 28V68C108 92.8 88.8 114.8 64 120C39.2 114.8 20 92.8 20 68V28L64 8Z" fill="url(#g)"/>
+    <rect x="56" y="34" width="16" height="60" rx="8" fill="#ffffff"/>
+    <circle cx="64" cy="28" r="6" fill="#ffffff"/>
+  </g>
+</svg>
