@@ -41,7 +41,15 @@ a:hover{text-decoration:underline}
 /* Submenu */
 .nav-list > li{position:relative}
 .has-sub > .submenu{position:absolute;top:36px;left:0;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:10px 12px;list-style:none;min-width:220px;z-index:20;opacity:0;transform:translateY(6px);visibility:hidden;pointer-events:none;transition:opacity .18s ease, transform .18s ease, visibility .18s step-end}
-.has-sub:hover > .submenu{opacity:1;transform:translateY(0);visibility:visible;pointer-events:auto;transition:opacity .2s ease, transform .2s ease, visibility 0s}
+@media (min-width: 769px) {
+  .has-sub:hover > .submenu {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity .2s ease, transform .2s ease, visibility 0s;
+  }
+}
 .submenu li a{display:block;padding:8px 10px;border-radius:8px}
 .submenu li a:hover{background:var(--bg-muted);text-decoration:none}
 
