@@ -12,7 +12,7 @@ window.IlkeSendika = (function(){
   function qs(sel, root=document){ return root.querySelector(sel); }
   function qsa(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
 
-  function initNav() {
+function initNav() {
   const navToggle = document.querySelector('.nav-toggle');
   const navMenu = document.getElementById('navMenu');
   if (!navToggle || !navMenu) return;
@@ -26,20 +26,13 @@ window.IlkeSendika = (function(){
   // Menüdeki tüm linklere tıklama olayı ekle
   document.querySelectorAll('#navMenu a').forEach(anchor => {
     anchor.addEventListener('click', (event) => {
-      // Bu mantık sadece mobil ekranlar için
-      if (window.innerWidth > 768) {
-        return;
-      }
+      if (window.innerWidth > 768) return; // Sadece mobil
 
       const parentLi = anchor.closest('li');
       if (!parentLi) return;
 
-      const isHomePageLink = anchor.getAttribute('href') === 'index.html';
-      const hasSubmenu = parentLi.classList.contains('has-sub');
-
-      // --- İSTEDİĞİNİZ ÖZEL KOŞUL ---
-      if (isHomePageLink) {
-        // Eğer "Anasayfa" linkine tıklandıysa:
+      // --- "Anasayfa" için özel mantık ---
+      if (anchor.getAttribute('href') === 'index.html') {
         if (!parentLi.classList.contains('open')) {
           // 1. Alt menü kapalıysa (ilk tıklama):
           //    - Yönlenmeyi engelle.
@@ -48,14 +41,13 @@ window.IlkeSendika = (function(){
           parentLi.classList.add('open');
           anchor.setAttribute('aria-expanded', 'true');
         }
-        // 2. Alt menü zaten açıksa (ikinci tıklama):
-        //    - Hiçbir şey yapma, tarayıcının normal şekilde
-        //      sayfaya yönlenmesine izin ver.
-        return;
+        // 2. Alt menü açıksa (ikinci tıklama), hiçbir şey yapma.
+        //    Tarayıcının normal şekilde yönlenmesine izin ver.
+        return; 
       }
 
-      // --- Diğer Menü Elemanları İçin Genel Mantık ---
-      if (hasSubmenu) {
+      // --- Diğer tüm linkler için genel mantık ---
+      if (parentLi.classList.contains('has-sub')) {
         // "Kurumsal" gibi diğer alt menülü linkler her zaman yönlenmeyi engeller.
         event.preventDefault();
         const isOpen = parentLi.classList.toggle('open');
