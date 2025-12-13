@@ -13,53 +13,57 @@ window.IlkeSendika = (function(){
   function qsa(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
 
   function initNav() {
-  const toggle = qs('.nav-toggle');
-  const menu = qs('#navMenu');
-  if (!toggle || !menu) return;
+  const navToggle = document.querySelector('.nav-toggle');
+  const navMenu = document.getElementById('navMenu');
+  if (!navToggle || !navMenu) return;
 
   // Ana menüyü aç/kapat
-  toggle.addEventListener('click', () => {
-    const open = menu.classList.toggle('open');
-    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  navToggle.addEventListener('click', () => {
+    const isOpen = navMenu.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', String(isOpen));
   });
 
-  // Menü içindeki tüm link tıklamalarını yönet
-  qsa('#navMenu a').forEach(anchor => {
-    anchor.addEventListener('click', (e) => {
-      // Bu özel mantık sadece mobil için geçerli
-      if (window.innerWidth > 768) return;
+  // Menüdeki tüm linklere tıklama olayı ekle
+  document.querySelectorAll('#navMenu a').forEach(anchor => {
+    anchor.addEventListener('click', (event) => {
+      // Bu mantık sadece mobil ekranlar için
+      if (window.innerWidth > 768) {
+        return;
+      }
 
-      const li = anchor.closest('li');
-      if (!li) return;
+      const parentLi = anchor.closest('li');
+      if (!parentLi) return;
 
-      const hasSubmenu = li.classList.contains('has-sub');
+      const isHomePageLink = anchor.getAttribute('href') === 'index.html';
+      const hasSubmenu = parentLi.classList.contains('has-sub');
 
-      if (hasSubmenu) {
-        // --- Alt menüsü olan linkler için mantık ---
-        const isHomePageLink = anchor.getAttribute('href') === 'index.html';
-        const isSubmenuOpen = li.classList.contains('open');
-
-        if (isHomePageLink) {
-          // **İstediğiniz özel koşul burada**
-          // Eğer alt menü AÇIKSA, yönlendirmeye izin ver (ikinci tıklama).
-          // Eğer alt menü KAPALIYSA, yönlendirmeyi engelle (ilk tıklama).
-          if (!isSubmenuOpen) {
-            e.preventDefault(); // Yönlenmeyi engelle
-          }
-        } else {
-          // "Anasayfa" dışındaki diğer alt menülü linkler her zaman yönlenmeyi engeller.
-          e.preventDefault();
+      // --- İSTEDİĞİNİZ ÖZEL KOŞUL ---
+      if (isHomePageLink) {
+        // Eğer "Anasayfa" linkine tıklandıysa:
+        if (!parentLi.classList.contains('open')) {
+          // 1. Alt menü kapalıysa (ilk tıklama):
+          //    - Yönlenmeyi engelle.
+          //    - Alt menüyü aç.
+          event.preventDefault();
+          parentLi.classList.add('open');
+          anchor.setAttribute('aria-expanded', 'true');
         }
-        
-        // Her durumda alt menüyü aç/kapat
-        const isOpen = li.classList.toggle('open');
-        anchor.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        // 2. Alt menü zaten açıksa (ikinci tıklama):
+        //    - Hiçbir şey yapma, tarayıcının normal şekilde
+        //      sayfaya yönlenmesine izin ver.
+        return;
+      }
 
+      // --- Diğer Menü Elemanları İçin Genel Mantık ---
+      if (hasSubmenu) {
+        // "Kurumsal" gibi diğer alt menülü linkler her zaman yönlenmeyi engeller.
+        event.preventDefault();
+        const isOpen = parentLi.classList.toggle('open');
+        anchor.setAttribute('aria-expanded', String(isOpen));
       } else {
-        // --- Alt menüsü olmayan normal linkler için mantık ---
-        // Ana menüyü kapat ve yönlenmeye izin ver.
-        menu.classList.remove('open');
-        toggle.setAttribute('aria-expanded', 'false');
+        // Alt menüsü olmayan normal linkler ana menüyü kapatır.
+        navMenu.classList.remove('open');
+        navToggle.setAttribute('aria-expanded', 'false');
       }
     });
   });
