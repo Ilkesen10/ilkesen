@@ -17,16 +17,16 @@ function initNav() {
   const navMenu = document.getElementById('navMenu');
   if (!navToggle || !navMenu) return;
 
-  // Ana menüyü aç/kapat
+  // Ana menüyü (hamburger) aç/kapat
   navToggle.addEventListener('click', () => {
     const isOpen = navMenu.classList.toggle('open');
     navToggle.setAttribute('aria-expanded', String(isOpen));
   });
 
-  // Menüdeki tüm linklere tıklama olayı ekle
+  // Menü içindeki tüm link tıklamalarını yönet
   document.querySelectorAll('#navMenu a').forEach(anchor => {
     anchor.addEventListener('click', (event) => {
-      // Bu mantık sadece mobil ekranlar için
+      // Bu mantık sadece mobil ekranlar için geçerlidir
       if (window.innerWidth > 768) {
         return;
       }
@@ -34,66 +34,23 @@ function initNav() {
       const parentLi = anchor.closest('li');
       if (!parentLi) return;
 
-      const isHomePageLink = anchor.getAttribute('href') === 'index.html';
-      const hasSubmenu = parentLi.classList.contains('has-sub');
-
-      // --- "Anasayfa" için özel mantık ---
-      if (isHomePageLink) {
-        if (!parentLi.classList.contains('open')) {
-          // 1. Alt menü kapalıysa (ilk tıklama):
-          //    - Yönlenmeyi engelle.
-          //    - Alt menüyü aç.
-          event.preventDefault();
-          parentLi.classList.add('open');
-          anchor.setAttribute('aria-expanded', 'true');
-        }
-        // 2. Alt menü açıksa (ikinci tıklama), hiçbir şey yapma.
-        //    Tarayıcının normal şekilde yönlenmesine izin ver.
-        return;
-      }
-
-      // --- Diğer tüm linkler için genel mantık ---
-      if (hasSubmenu) {
-        // "Kurumsal" gibi diğer alt menülü linkler her zaman yönlenmeyi engeller.
+      // Eğer tıklanan linkin ebeveyni bir alt menü kabı ise ("Kurumsal" gibi)
+      if (parentLi.classList.contains('has-sub')) {
+        // Linkin normalde gideceği yere gitmesini engelle
         event.preventDefault();
+        // ve alt menüyü aç/kapat.
         const isOpen = parentLi.classList.toggle('open');
         anchor.setAttribute('aria-expanded', String(isOpen));
       } else {
-        // Alt menüsü olmayan normal linkler ana menüyü kapatır.
+        // Diğer tüm normal linklere ("Anasayfa", "Vizyon" vb.) tıklandığında
+        // ana menüyü kapat. Link normal şekilde çalışmaya devam edecek.
         navMenu.classList.remove('open');
         navToggle.setAttribute('aria-expanded', 'false');
       }
     });
   });
 }
-
-    anchor.addEventListener('click', (event) => {
-      if (window.innerWidth > 768) return;
-
-      // UYGULAMA: Eğer mousedown'da click'i engelleme kararı alındıysa,
-      // preventDefault() çağır ve menüyü aç.
-      if (preventClick) {
-        event.preventDefault();
-        parentLi.classList.toggle('open');
-        anchor.setAttribute('aria-expanded', 'true');
-        return; // Başka bir işlem yapma
-      }
-
-      // "Anasayfa" dışındaki diğer alt menülü linkler için standart davranış
-      if (parentLi.classList.contains('has-sub') && anchor.getAttribute('href') !== 'index.html') {
-        event.preventDefault();
-        const isOpen = parentLi.classList.toggle('open');
-        anchor.setAttribute('aria-expanded', String(isOpen));
-      } else if (!parentLi.classList.contains('has-sub')) {
-        // Alt menüsü olmayan linkler ana menüyü kapatır
-        navMenu.classList.remove('open');
-        navToggle.setAttribute('aria-expanded', 'false');
-      }
-      // "Anasayfa" linkine ikinci tıklamada bu blokların hiçbiri çalışmaz,
-      // ve tarayıcı normal şekilde yönlenir.
-    });
-  });
-}
+ 
   // Ensure menu items exist and correct ordering across all pages
   function ensureMenuStructure(){
     try{
