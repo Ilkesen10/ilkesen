@@ -448,7 +448,6 @@ try{
   function init(){
     initNav();
     ensureMenuStructure();
-    initMobileSubmenus();
     initSlider();
     initYear();
     initPolicyModal();
