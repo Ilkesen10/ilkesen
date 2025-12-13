@@ -12,7 +12,7 @@ window.IlkeSendika = (function(){
   function qs(sel, root=document){ return root.querySelector(sel); }
   function qsa(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
 
-  function initNav() {
+function initNav() {
   const navToggle = document.querySelector('.nav-toggle');
   const navMenu = document.getElementById('navMenu');
   if (!navToggle || !navMenu) return;
