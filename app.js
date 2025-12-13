@@ -282,20 +282,26 @@ qsa('#navMenu a').forEach(anchor => {
     const width = () => window.innerWidth || document.documentElement.clientWidth;
     
     qsa('#navMenu > li.has-sub > a').forEach(anchor => {
-      // Use a named function to be able to remove it later if needed
       const handleSubmenuToggle = (e) => {
         if (width() <= 768) {
-          // On mobile, this link's only job is to open the submenu.
-          e.preventDefault();
+          // Check if the link is the "Anasayfa" link by its href
+          const isHomePageLink = anchor.getAttribute('href') === 'index.html';
+          
+          // If it's NOT the homepage link, prevent navigation and just toggle.
+          // If it IS the homepage link, allow navigation to proceed.
+          if (!isHomePageLink) {
+            e.preventDefault();
+          }
+          
           const li = anchor.parentElement;
           if (li) {
+            // We still toggle the menu for all has-sub links
             const isOpen = li.classList.toggle('open');
             anchor.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
           }
         }
       };
       
-      // Add the event listener
       anchor.addEventListener('click', handleSubmenuToggle);
     });
   }
