@@ -25,38 +25,51 @@ function initNav() {
 
   // Menüdeki tüm linklere tıklama olayı ekle
   document.querySelectorAll('#navMenu a').forEach(anchor => {
+    const parentLi = anchor.closest('li');
+    if (!parentLi) return;
+
+    // Bu değişken, mousedown ve click arasında karar taşır
+    let preventClick = false;
+
+    anchor.addEventListener('mousedown', (event) => {
+      if (window.innerWidth > 768) return;
+
+      const isHomePageLink = anchor.getAttribute('href') === 'index.html';
+      const isSubmenuOpen = parentLi.classList.contains('open');
+
+      if (isHomePageLink && !isSubmenuOpen) {
+        // KARAR: Anasayfa linkine tıklandı ve alt menü kapalı.
+        // Öyleyse, bir sonraki 'click' olayını engelle.
+        preventClick = true;
+      } else {
+        preventClick = false;
+      }
+    });
+
     anchor.addEventListener('click', (event) => {
-      if (window.innerWidth > 768) return; // Sadece mobil
+      if (window.innerWidth > 768) return;
 
-      const parentLi = anchor.closest('li');
-      if (!parentLi) return;
-
-      // --- "Anasayfa" için özel mantık ---
-      if (anchor.getAttribute('href') === 'index.html') {
-        if (!parentLi.classList.contains('open')) {
-          // 1. Alt menü kapalıysa (ilk tıklama):
-          //    - Yönlenmeyi engelle.
-          //    - Alt menüyü aç.
-          event.preventDefault();
-          parentLi.classList.add('open');
-          anchor.setAttribute('aria-expanded', 'true');
-        }
-        // 2. Alt menü açıksa (ikinci tıklama), hiçbir şey yapma.
-        //    Tarayıcının normal şekilde yönlenmesine izin ver.
-        return; 
+      // UYGULAMA: Eğer mousedown'da click'i engelleme kararı alındıysa,
+      // preventDefault() çağır ve menüyü aç.
+      if (preventClick) {
+        event.preventDefault();
+        parentLi.classList.toggle('open');
+        anchor.setAttribute('aria-expanded', 'true');
+        return; // Başka bir işlem yapma
       }
 
-      // --- Diğer tüm linkler için genel mantık ---
-      if (parentLi.classList.contains('has-sub')) {
-        // "Kurumsal" gibi diğer alt menülü linkler her zaman yönlenmeyi engeller.
+      // "Anasayfa" dışındaki diğer alt menülü linkler için standart davranış
+      if (parentLi.classList.contains('has-sub') && anchor.getAttribute('href') !== 'index.html') {
         event.preventDefault();
         const isOpen = parentLi.classList.toggle('open');
         anchor.setAttribute('aria-expanded', String(isOpen));
-      } else {
-        // Alt menüsü olmayan normal linkler ana menüyü kapatır.
+      } else if (!parentLi.classList.contains('has-sub')) {
+        // Alt menüsü olmayan linkler ana menüyü kapatır
         navMenu.classList.remove('open');
         navToggle.setAttribute('aria-expanded', 'false');
       }
+      // "Anasayfa" linkine ikinci tıklamada bu blokların hiçbiri çalışmaz,
+      // ve tarayıcı normal şekilde yönlenir.
     });
   });
 }
