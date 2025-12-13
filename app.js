@@ -13,51 +13,57 @@ window.IlkeSendika = (function(){
   function qsa(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
 
   function initNav() {
-    const toggle = qs('.nav-toggle');
-    const menu = qs('#navMenu');
-    if (!toggle || !menu) return;
-  
-    // Main menu toggle
-    toggle.addEventListener('click', () => {
-      const open = menu.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
-  
-    // Handle all link clicks within the menu
-    qsa('#navMenu a').forEach(anchor => {
-      anchor.addEventListener('click', (e) => {
-        const li = anchor.closest('li');
-        if (!li) return;
-  
-        const isSubmenuToggle = li.classList.contains('has-sub');
-        const isMobile = window.innerWidth <= 768;
-  
-        // --- Mobile Logic ---
-        if (isMobile) {
-          if (isSubmenuToggle) {
-            // This is a link with a submenu (like "Kurumsal" or "Anasayfa")
-            const isHomePageLink = anchor.getAttribute('href') === 'index.html';
-  
-            // If it's NOT the homepage link, prevent navigation.
-            // Allow homepage link to navigate.
-            if (!isHomePageLink) {
-              e.preventDefault();
-            }
-            
-            // Always toggle the submenu open/closed
-            const isOpen = li.classList.toggle('open');
-            anchor.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-  
-          } else {
-            // This is a regular link with no submenu. Close the main menu.
-            menu.classList.remove('open');
-            toggle.setAttribute('aria-expanded', 'false');
+  const toggle = qs('.nav-toggle');
+  const menu = qs('#navMenu');
+  if (!toggle || !menu) return;
+
+  // Ana menüyü aç/kapat
+  toggle.addEventListener('click', () => {
+    const open = menu.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  // Menü içindeki tüm link tıklamalarını yönet
+  qsa('#navMenu a').forEach(anchor => {
+    anchor.addEventListener('click', (e) => {
+      // Bu özel mantık sadece mobil için geçerli
+      if (window.innerWidth > 768) return;
+
+      const li = anchor.closest('li');
+      if (!li) return;
+
+      const hasSubmenu = li.classList.contains('has-sub');
+
+      if (hasSubmenu) {
+        // --- Alt menüsü olan linkler için mantık ---
+        const isHomePageLink = anchor.getAttribute('href') === 'index.html';
+        const isSubmenuOpen = li.classList.contains('open');
+
+        if (isHomePageLink) {
+          // **İstediğiniz özel koşul burada**
+          // Eğer alt menü AÇIKSA, yönlendirmeye izin ver (ikinci tıklama).
+          // Eğer alt menü KAPALIYSA, yönlendirmeyi engelle (ilk tıklama).
+          if (!isSubmenuOpen) {
+            e.preventDefault(); // Yönlenmeyi engelle
           }
+        } else {
+          // "Anasayfa" dışındaki diğer alt menülü linkler her zaman yönlenmeyi engeller.
+          e.preventDefault();
         }
-        // --- Desktop logic is handled by CSS :hover, no JS needed ---
-      });
+        
+        // Her durumda alt menüyü aç/kapat
+        const isOpen = li.classList.toggle('open');
+        anchor.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+
+      } else {
+        // --- Alt menüsü olmayan normal linkler için mantık ---
+        // Ana menüyü kapat ve yönlenmeye izin ver.
+        menu.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+      }
     });
-  }
+  });
+}
   // Ensure menu items exist and correct ordering across all pages
   function ensureMenuStructure(){
     try{
