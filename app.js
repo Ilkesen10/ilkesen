@@ -12,17 +12,15 @@ window.IlkeSendika = (function(){
   function qs(sel, root=document){ return root.querySelector(sel); }
   function qsa(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
 
-function initNav() {
+  function initNav() {
   const navToggle = document.querySelector('.nav-toggle');
   const navMenu = document.getElementById('navMenu');
   if (!navToggle || !navMenu) return;
-
   // Ana menüyü (hamburger) aç/kapat
   navToggle.addEventListener('click', () => {
     const isOpen = navMenu.classList.toggle('open');
     navToggle.setAttribute('aria-expanded', String(isOpen));
   });
-
   // Menü içindeki tüm link tıklamalarını yönet
   document.querySelectorAll('#navMenu a').forEach(anchor => {
     anchor.addEventListener('click', (event) => {
@@ -30,10 +28,8 @@ function initNav() {
       if (window.innerWidth > 768) {
         return;
       }
-
       const parentLi = anchor.closest('li');
       if (!parentLi) return;
-
       // Eğer tıklanan linkin ebeveyni bir alt menü kabı ise ("Kurumsal" gibi)
       if (parentLi.classList.contains('has-sub')) {
         // Linkin normalde gideceği yere gitmesini engelle
