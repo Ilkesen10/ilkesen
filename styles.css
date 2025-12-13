@@ -53,9 +53,22 @@ a:hover{text-decoration:underline}
 .submenu li a{display:block;padding:8px 10px;border-radius:8px}
 .submenu li a:hover{background:var(--bg-muted);text-decoration:none}
 
-@media (max-width:768px){
-  .has-sub > .submenu{position:static;display:none;border:none;box-shadow:none;padding:6px 0}
-  .has-sub.open > .submenu{display:block}
+@media (max-width: 768px) {
+  .has-sub > .submenu {
+    position: static;
+    display: none;
+    border: none;
+    box-shadow: none;
+    padding: 6px 0 6px 16px; /* Indent submenu items */
+    opacity: 1; /* Override desktop styles */
+    visibility: visible; /* Override desktop styles */
+    transform: none; /* Override desktop styles */
+    pointer-events: auto; /* Override desktop styles */
+    transition: none; /* Disable transitions on mobile */
+  }
+  .has-sub.open > .submenu {
+    display: block;
+  }
 }
 
 @media (max-width:768px){

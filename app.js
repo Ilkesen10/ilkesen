@@ -21,13 +21,22 @@ window.IlkeSendika = (function(){
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
 
-    // Close on link click (mobile)
-    qsa('#navMenu a').forEach(a => a.addEventListener('click', () => {
-      menu.classList.remove('open');
-      toggle.setAttribute('aria-expanded', 'false');
-    }));
+    // Close on link click (mobile), but not for submenu toggles
+qsa('#navMenu a').forEach(anchor => {
+  anchor.addEventListener('click', (e) => {
+    // Find the parent LI of the clicked anchor
+    const parentLi = anchor.closest('li');
+    
+    // If the parent LI does NOT have a submenu, close the main menu
+    if (parentLi && !parentLi.classList.contains('has-sub')) {
+      const menu = qs('#navMenu');
+      const toggle = qs('.nav-toggle');
+      if (menu) menu.classList.remove('open');
+      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+});
   }
-
   // Ensure menu items exist and correct ordering across all pages
   function ensureMenuStructure(){
     try{
