@@ -12,30 +12,51 @@ window.IlkeSendika = (function(){
   function qs(sel, root=document){ return root.querySelector(sel); }
   function qsa(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
 
-  function initNav(){
+  function initNav() {
     const toggle = qs('.nav-toggle');
     const menu = qs('#navMenu');
     if (!toggle || !menu) return;
+  
+    // Main menu toggle
     toggle.addEventListener('click', () => {
       const open = menu.classList.toggle('open');
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
-
-    // Close on link click (mobile), but not for submenu toggles
-qsa('#navMenu a').forEach(anchor => {
-  anchor.addEventListener('click', (e) => {
-    // Find the parent LI of the clicked anchor
-    const parentLi = anchor.closest('li');
-    
-    // If the parent LI does NOT have a submenu, close the main menu
-    if (parentLi && !parentLi.classList.contains('has-sub')) {
-      const menu = qs('#navMenu');
-      const toggle = qs('.nav-toggle');
-      if (menu) menu.classList.remove('open');
-      if (toggle) toggle.setAttribute('aria-expanded', 'false');
-    }
-  });
-});
+  
+    // Handle all link clicks within the menu
+    qsa('#navMenu a').forEach(anchor => {
+      anchor.addEventListener('click', (e) => {
+        const li = anchor.closest('li');
+        if (!li) return;
+  
+        const isSubmenuToggle = li.classList.contains('has-sub');
+        const isMobile = window.innerWidth <= 768;
+  
+        // --- Mobile Logic ---
+        if (isMobile) {
+          if (isSubmenuToggle) {
+            // This is a link with a submenu (like "Kurumsal" or "Anasayfa")
+            const isHomePageLink = anchor.getAttribute('href') === 'index.html';
+  
+            // If it's NOT the homepage link, prevent navigation.
+            // Allow homepage link to navigate.
+            if (!isHomePageLink) {
+              e.preventDefault();
+            }
+            
+            // Always toggle the submenu open/closed
+            const isOpen = li.classList.toggle('open');
+            anchor.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  
+          } else {
+            // This is a regular link with no submenu. Close the main menu.
+            menu.classList.remove('open');
+            toggle.setAttribute('aria-expanded', 'false');
+          }
+        }
+        // --- Desktop logic is handled by CSS :hover, no JS needed ---
+      });
+    });
   }
   // Ensure menu items exist and correct ordering across all pages
   function ensureMenuStructure(){
@@ -277,36 +298,7 @@ qsa('#navMenu a').forEach(anchor => {
 
   // (duplicate removed)
 
-  function initMobileSubmenus() {
-    // Toggle submenus on small screens by tapping the parent link
-    const width = () => window.innerWidth || document.documentElement.clientWidth;
-    
-    qsa('#navMenu > li.has-sub > a').forEach(anchor => {
-      const handleSubmenuToggle = (e) => {
-        if (width() <= 768) {
-          // Check if the link is the "Anasayfa" link by its href
-          const isHomePageLink = anchor.getAttribute('href') === 'index.html';
-          
-          // If it's NOT the homepage link, prevent navigation and just toggle.
-          // If it IS the homepage link, allow navigation to proceed.
-          if (!isHomePageLink) {
-            e.preventDefault();
-          }
-          
-          const li = anchor.parentElement;
-          if (li) {
-            // We still toggle the menu for all has-sub links
-            const isOpen = li.classList.toggle('open');
-            anchor.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-          }
-        }
-      };
-      
-      anchor.addEventListener('click', handleSubmenuToggle);
-    });
-  }
-
-  function initSlider(){
+    function initSlider(){
     const slider = qs('[data-slider]');
     if (!slider) return;
     const track = qs('[data-slides]', slider);
