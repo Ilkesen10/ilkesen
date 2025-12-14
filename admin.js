@@ -43,6 +43,7 @@
   let currentTab = 'news';
   let currentAdmin = { email:null, roles:[], allowed_tabs:[] };
   let editing = null; // { type: 'news'|'ann', id: string|null }
+  let messagesById = new Map();
 
 // Seçime inline stil uygula (ör. font-size)
 // NOTE: Tek bir kez, IIFE içinde üst seviye scope’a ekleyin.
@@ -1647,8 +1648,22 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         }
         if (data && data.ok === false){ throw new Error(data.error || 'Gönderim hatası'); }
 
-        if (msgId) { try{ await sb().from('messages').update({ is_replied: true }).eq('id', msgId); }catch{} }
+        if (msgId) {
+          try{
+            const repliedBy = (currentAdmin && currentAdmin.email) ? String(currentAdmin.email) : '';
+            await sb().from('messages').update({
+              is_replied: true,
+              replied_at: new Date().toISOString(),
+              replied_by: repliedBy,
+              reply_subject: subject,
+              reply_body: message
+            }).eq('id', msgId);
+          }catch{
+            try{ await sb().from('messages').update({ is_replied: true }).eq('id', msgId); }catch{}
+          }
+        }
         closeModal();
+        try{ alert('Mesajınız cevaplanmıştır.'); }catch{}
         if (typeof afterSend === 'function') try{ await afterSend(); }catch{}
       }catch(err){
         alert('E‑posta gönderilemedi: ' + (err?.message||String(err)));
@@ -1750,6 +1765,193 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       const addBtn = qs('#newAnnBtn'); if (addBtn && !addBtn.dataset.wired){ addBtn.dataset.wired='1'; addBtn.onclick = ()=> openAnnModal({ id:null, title:'', body:'', image_url:'', status:'draft' }); }
       wireAnnRowActions();
     }catch(e){ alert('Duyurular yüklenemedi: ' + (e?.message||String(e))); }
+  }
+
+  async function loadAdminMessages(){
+    const tbody = $msgsTBody(); if (!tbody) return;
+    tbody.innerHTML = '';
+    messagesById = new Map();
+    try{
+      const refreshBtn = document.getElementById('refreshMsgsBtn');
+      if (refreshBtn && !refreshBtn.dataset.wired){
+        refreshBtn.dataset.wired = '1';
+        refreshBtn.addEventListener('click', (e)=>{ e.preventDefault(); loadAdminMessages(); });
+      }
+    }catch{}
+
+    try{
+      const { data, error } = await sb()
+        .from('messages')
+        .select('id, name, email, subject, body, created_at, is_read, is_replied')
+        .order('created_at', { ascending:false, nullsFirst:true });
+      if (error) throw error;
+
+      (data||[]).forEach(row => {
+        try{ if (row && row.id) messagesById.set(row.id, row); }catch{}
+        const tr = document.createElement('tr');
+        const tags = [];
+        if (row && row.is_read) tags.push('Okundu');
+        if (row && row.is_replied) tags.push('Cevaplandı');
+        const tagHtml = tags.length ? `<div class="muted" style="margin-top:4px">${escapeHtml(tags.join(' • '))}</div>` : '';
+        const when = row && row.created_at ? new Date(row.created_at).toLocaleString('tr-TR') : '-';
+        tr.innerHTML = `
+          <td>${escapeHtml(row?.name || '')}</td>
+          <td>${escapeHtml(row?.email || '')}</td>
+          <td>${escapeHtml(row?.subject || '')}${tagHtml}</td>
+          <td>${when}</td>
+          <td class="actions">
+            <button class="btn btn-warning" data-view-msg="${row.id}">Oku</button>
+            <button class="btn btn-success" data-reply-msg="${row.id}">Cevapla</button>
+            ${row && row.is_read ? '' : `<button class="btn btn-outline" data-read-msg="${row.id}">Okundu</button>`}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      wireMsgsRowActions();
+    }catch(e){
+      alert('Mesajlar yüklenemedi: ' + (e?.message||String(e)));
+    }
+  }
+
+  function wireMsgsRowActions(){
+    const tbody = $msgsTBody(); if (!tbody) return;
+    try{
+      tbody.querySelectorAll('button[data-view-msg]').forEach(btn=>{
+        if (btn.dataset.wired) return; btn.dataset.wired='1';
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-view-msg');
+          const row = messagesById.get(id);
+          if (!row) return;
+          try{
+            if (!row.is_read){
+              await sb().from('messages').update({ is_read: true }).eq('id', id);
+              row.is_read = true;
+            }
+          }catch{}
+          await openMessageModal(row);
+          try{ await loadAdminMessages(); }catch{}
+        });
+      });
+      tbody.querySelectorAll('button[data-read-msg]').forEach(btn=>{
+        if (btn.dataset.wired) return; btn.dataset.wired='1';
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-read-msg');
+          try{ await sb().from('messages').update({ is_read: true }).eq('id', id); }catch(e){ alert('Güncellenemedi: ' + (e?.message||String(e))); }
+          try{ await loadAdminMessages(); }catch{}
+        });
+      });
+      tbody.querySelectorAll('button[data-reply-msg]').forEach(btn=>{
+        if (btn.dataset.wired) return; btn.dataset.wired='1';
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-reply-msg');
+          const row = messagesById.get(id);
+          if (!row) return;
+          try{
+            if (!row.is_read){
+              await sb().from('messages').update({ is_read: true }).eq('id', id);
+              row.is_read = true;
+            }
+          }catch{}
+          openEmailCompose(row.email, row.subject, id, async ()=>{ try{ await loadAdminMessages(); }catch{} });
+          try{ await loadAdminMessages(); }catch{}
+        });
+      });
+    }catch{}
+  }
+
+  async function openMessageModal(row){
+    try{
+      let fullRow = row;
+      try{
+        if (row && row.id){
+          const { data } = await sb().from('messages').select('*').eq('id', row.id).maybeSingle();
+          if (data) fullRow = data;
+        }
+      }catch{}
+
+      $modalTitle().textContent = 'Mesaj';
+      const form = $modalForm();
+      form.innerHTML = '';
+
+      const wrap = document.createElement('div');
+      wrap.style.display = 'grid';
+      wrap.style.gap = '8px';
+      form.appendChild(wrap);
+
+      function roInput(label, val, type){
+        const lbl = document.createElement('label');
+        lbl.style.display='grid';
+        lbl.style.gap='6px';
+        lbl.innerHTML = `<span>${escapeHtml(label)}</span>`;
+        const inp = document.createElement('input');
+        inp.type = type || 'text';
+        inp.value = String(val || '');
+        inp.disabled = true;
+        lbl.appendChild(inp);
+        return lbl;
+      }
+
+      wrap.appendChild(roInput('Ad', fullRow?.name || '', 'text'));
+      wrap.appendChild(roInput('E‑posta', fullRow?.email || '', 'email'));
+      wrap.appendChild(roInput('Konu', fullRow?.subject || '', 'text'));
+      wrap.appendChild(roInput('Tarih', fullRow?.created_at ? new Date(fullRow.created_at).toLocaleString('tr-TR') : '-', 'text'));
+
+      const mLbl = document.createElement('label');
+      mLbl.style.display='grid';
+      mLbl.style.gap='6px';
+      mLbl.innerHTML = '<span>Mesaj</span>';
+      const ta = document.createElement('textarea');
+      ta.rows = 12;
+      ta.value = String(fullRow?.body || '');
+      ta.disabled = true;
+      mLbl.appendChild(ta);
+      wrap.appendChild(mLbl);
+
+      try{
+        const replyBody = (fullRow && (fullRow.reply_body ?? fullRow.replyBody ?? fullRow.reply_message ?? fullRow.replyMessage)) || '';
+        const replySubj = (fullRow && (fullRow.reply_subject ?? fullRow.replySubject)) || '';
+        const repliedAt = (fullRow && (fullRow.replied_at ?? fullRow.repliedAt)) || null;
+        const repliedBy = (fullRow && (fullRow.replied_by ?? fullRow.repliedBy)) || '';
+        if (String(replyBody||'').trim() || String(replySubj||'').trim() || repliedAt || String(repliedBy||'').trim()){
+          wrap.appendChild(roInput('Yanıtlayan', repliedBy || '-', 'text'));
+          wrap.appendChild(roInput('Yanıt Tarihi', repliedAt ? new Date(repliedAt).toLocaleString('tr-TR') : '-', 'text'));
+          wrap.appendChild(roInput('Yanıt Konusu', replySubj || '-', 'text'));
+          const rLbl = document.createElement('label');
+          rLbl.style.display='grid';
+          rLbl.style.gap='6px';
+          rLbl.innerHTML = '<span>Verilen Yanıt</span>';
+          const rTa = document.createElement('textarea');
+          rTa.rows = 10;
+          rTa.value = String(replyBody || '');
+          rTa.disabled = true;
+          rLbl.appendChild(rTa);
+          wrap.appendChild(rLbl);
+        }
+      }catch{}
+
+      const actions = document.createElement('div');
+      actions.style.display = 'flex';
+      actions.style.gap = '8px';
+      const replyBtn = document.createElement('button');
+      replyBtn.className = 'btn btn-success';
+      replyBtn.textContent = 'Cevapla';
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'btn btn-danger';
+      closeBtn.textContent = 'Kapat';
+      actions.appendChild(replyBtn);
+      actions.appendChild(closeBtn);
+      wrap.appendChild(actions);
+
+      closeBtn.addEventListener('click', (e)=>{ e.preventDefault(); closeModal(); });
+      replyBtn.addEventListener('click', (e)=>{
+        e.preventDefault();
+        openEmailCompose(fullRow?.email, fullRow?.subject, fullRow?.id, async ()=>{ try{ await loadAdminMessages(); }catch{} });
+      });
+
+      (typeof openModal === 'function' ? openModal() : (window.openModal && window.openModal()));
+    }catch(e){
+      alert('Mesaj açılamadı: ' + (e?.message||String(e)));
+    }
   }
 
   function wireNewsRowActions(){
@@ -2726,7 +2928,6 @@ async function loadAdminChairman(){
    prevCanvas.style.border = '1px solid #e5e7eb';
    prevCanvas.style.borderRadius = '10px';
    left.appendChild(prevCanvas);
-   form.appendChild(left);
 
    let prevImg = null;
    async function ensurePrevImg(){
