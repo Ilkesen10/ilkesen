@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 (function(){
   const sb = () => window.ilkeSupabase;
@@ -1429,10 +1429,12 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       if (error) throw error;
       (data||[]).forEach(row => {
         const tr = document.createElement('tr');
+        const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı' };
+        const statusTr = statusMap[String(row.status||'').toLowerCase()] || (row.status||'');
         tr.innerHTML = `
           <td>${escapeHtml(row.title||'')}</td>
           <td>${escapeHtml(row.slug||'')}</td>
-          <td>${escapeHtml(row.status||'')}</td>
+          <td>${escapeHtml(statusTr)}</td>
           <td>${row.published_at ? new Date(row.published_at).toLocaleString('tr-TR') : '-'}</td>
           <td>${row.unpublish_at ? new Date(row.unpublish_at).toLocaleString('tr-TR') : '-'}</td>
           <td class="actions">
@@ -2432,9 +2434,11 @@ async function loadAdminPosters(){
     if (error) throw error;
     (data||[]).forEach(row => {
       const tr=document.createElement('tr');
+      const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı' };
+      const statusTr = statusMap[String(row.status||'').toLowerCase()] || (row.status||'');
       tr.innerHTML = `
         <td>${escapeHtml(row.title||'')}</td>
-        <td>${escapeHtml(row.status||'')}</td>
+        <td>${escapeHtml(statusTr)}</td>
         <td>${row.published_at ? new Date(row.published_at).toLocaleString('tr-TR') : '-'}</td>
         <td class="actions">
           <button class="btn btn-warning" data-edit-poster="${row.id}">Düzenle</button>
@@ -2534,7 +2538,14 @@ function openPosterModal(row){
 
     // Durum / Tarih
     const stLbl=document.createElement('label'); stLbl.style.display='grid'; stLbl.style.gap='6px'; stLbl.innerHTML='<span>Durum</span>';
-    const stSel=document.createElement('select'); ['draft','published','unpublished'].forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; if ((row.status||'draft')===v) o.selected=true; stSel.appendChild(o); }); stLbl.appendChild(stSel); form.appendChild(stLbl);
+    const stSel=document.createElement('select');
+    const statusOptsPoster = [
+      { v:'draft', t:'Taslak' },
+      { v:'published', t:'Yayımlandı' },
+      { v:'unpublished', t:'Yayından Kaldırıldı' },
+    ];
+    statusOptsPoster.forEach(({v,t})=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; if ((row.status||'draft')===v) o.selected=true; stSel.appendChild(o); });
+    stLbl.appendChild(stSel); form.appendChild(stLbl);
     const pLbl=document.createElement('label'); pLbl.style.display='grid'; pLbl.style.gap='6px'; pLbl.innerHTML='<span>Yayın Tarihi</span>';
     const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16):''; pLbl.appendChild(pIn); form.appendChild(pLbl);
 
@@ -2592,9 +2603,11 @@ async function loadAdminReports(){
     if (error) throw error;
     (data||[]).forEach(row => {
       const tr=document.createElement('tr');
+      const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı' };
+      const statusTr = statusMap[String(row.status||'').toLowerCase()] || (row.status||'');
       tr.innerHTML = `
         <td>${escapeHtml(row.title||'')}</td>
-        <td>${escapeHtml(row.status||'')}</td>
+        <td>${escapeHtml(statusTr)}</td>
         <td>${row.published_at ? new Date(row.published_at).toLocaleString('tr-TR') : '-'}</td>
         <td class="actions">
           <button class="btn btn-warning" data-edit-report="${row.id}">Düzenle</button>
@@ -2662,7 +2675,14 @@ function openReportModal(row){
 
     // Durum / Tarih
     const stLbl=document.createElement('label'); stLbl.style.display='grid'; stLbl.style.gap='6px'; stLbl.innerHTML='<span>Durum</span>';
-    const stSel=document.createElement('select'); ['draft','published','unpublished'].forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; if ((row.status||'draft')===v) o.selected=true; stSel.appendChild(o); }); stLbl.appendChild(stSel); form.appendChild(stLbl);
+    const stSel=document.createElement('select');
+    const statusOptsReport = [
+      { v:'draft', t:'Taslak' },
+      { v:'published', t:'Yayımlandı' },
+      { v:'unpublished', t:'Yayından Kaldırıldı' },
+    ];
+    statusOptsReport.forEach(({v,t})=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; if ((row.status||'draft')===v) o.selected=true; stSel.appendChild(o); });
+    stLbl.appendChild(stSel); form.appendChild(stLbl);
     const pLbl=document.createElement('label'); pLbl.style.display='grid'; pLbl.style.gap='6px'; pLbl.innerHTML='<span>Yayın Tarihi</span>';
     const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16):''; pLbl.appendChild(pIn); form.appendChild(pLbl);
 
@@ -2992,7 +3012,7 @@ async function loadAdminChairman(){
    right.appendChild(ed);
 
    const stLbl=document.createElement('label'); stLbl.style.display='grid'; stLbl.style.gap='6px'; stLbl.innerHTML='<span>Durum</span>';
-   const stSel=document.createElement('select'); ['draft','published','unpublished'].forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; if ((row.status||'draft')===v) o.selected=true; stSel.appendChild(o); }); stLbl.appendChild(stSel); right.appendChild(stLbl);
+   const stSel=document.createElement('select'); ['draft','published','unpublished'].forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=({draft:'Taslak', published:'Yayımlandı', unpublished:'Yayından Kaldırıldı'}[v]||v); if ((row.status||'draft')===v) o.selected=true; stSel.appendChild(o); }); stLbl.appendChild(stSel); right.appendChild(stLbl);
 
    const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
    const saveBtn=document.createElement('button'); saveBtn.className='btn btn-success'; saveBtn.textContent='Kaydet';
@@ -3054,7 +3074,7 @@ async function loadAdminFounders(){
         <td>${img}</td>
         <td>${escapeHtml(row.name || '')}</td>
         <td>${Number(row.sort || '') || ''}</td>
-        <td>${escapeHtml(row.status || 'draft')}</td>
+        <td>${escapeHtml(({published:'Yayımlandı',draft:'Taslak',scheduled:'Planlı',archived:'Arşivli',unpublished:'Yayından Kaldırıldı'}[String(row.status||'').toLowerCase()]||row.status||'draft'))}</td>
         <td class="actions">
           <button class="btn btn-warning" data-edit-founder="${row.id}">Düzenle</button>
           <button class="btn btn-danger" data-del-founder="${row.id}">Sil</button>
@@ -3275,7 +3295,7 @@ function openFounderModal(row){
    const stLbl = document.createElement('label'); stLbl.style.display='grid'; stLbl.style.gap='6px'; stLbl.innerHTML='<span>Durum</span>';
    const stSel = document.createElement('select');
    ['draft', 'published', 'unpublished'].forEach(v => {
-     const o = document.createElement('option'); o.value = v; o.textContent = v;
+     const o = document.createElement('option'); o.value = v; o.textContent = ({draft:'Taslak', published:'Yayımlandı', unpublished:'Yayından Kaldırıldı'}[v]||v);
      if ((row.status || 'draft') === v) o.selected = true;
      stSel.appendChild(o);
    });
@@ -3340,4 +3360,6 @@ function openFounderModal(row){
  }
 }
 })();
+
+
 
