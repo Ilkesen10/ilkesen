@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
@@ -133,20 +133,25 @@
 
       // cover meta: key|z=...,ox=...,oy=...,oxp=...,oyp=...
       function splitMetaUrl(u){
-        const s=String(u||''); const i=s.indexOf('|');
-        if(i<0) return { url:s, meta:null };
-        const base = s.slice(0,i); const tail = s.slice(i+1);
-        const meta = { z:1, ox:0, oy:0, oxp:null, oyp:null };
-        tail.split(',').forEach(p=>{
-          const [k,v] = p.split('='); const n=Number(v);
-          if(k==='z' && isFinite(n)) meta.z=n;
-          if(k==='ox' && isFinite(n)) meta.ox=Math.round(n);
-          if(k==='oy' && isFinite(n)) meta.oy=Math.round(n);
-          if(k==='oxp' && isFinite(n)) meta.oxp=n;
-          if(k==='oyp' && isFinite(n)) meta.oyp=n;
-        });
-        return { url: base, meta };
-      }
+  const s=String(u||''); const i=s.indexOf('|');
+  if(i<0) return { url:s, meta:null };
+  const base = s.slice(0,i); const tail = s.slice(i+1);
+  const meta = { z:1, ox:0, oy:0, oxp:null, oyp:null, zm:null, oxm:null, oym:null, oxpm:null, oypm:null };
+  tail.split(',').forEach(p=>{
+    const [k,v] = p.split('='); const n=Number(v);
+    if(k==='z' && isFinite(n)) meta.z=n;
+    if(k==='ox' && isFinite(n)) meta.ox=Math.round(n);
+    if(k==='oy' && isFinite(n)) meta.oy=Math.round(n);
+    if(k==='oxp' && isFinite(n)) meta.oxp=n;
+    if(k==='oyp' && isFinite(n)) meta.oyp=n;
+    if(k==='zm' && isFinite(n)) meta.zm=n;
+    if(k==='oxm' && isFinite(n)) meta.oxm=Math.round(n);
+    if(k==='oym' && isFinite(n)) meta.oym=Math.round(n);
+    if(k==='oxpm' && isFinite(n)) meta.oxpm=n;
+    if(k==='oypm' && isFinite(n)) meta.oypm=n;
+  });
+  return { url: base, meta };
+}
 
       items.forEach((n,idx)=>{
         const art=document.createElement('article');
@@ -171,23 +176,30 @@
           bg.style.backgroundRepeat='no-repeat';
 
           if (meta){
-            const z = Math.max(1, Number(meta.z||1));
-            bg.style.backgroundSize = `${Math.round(100*z)}%`;
-            const hasPercent = (meta.oxp != null && isFinite(meta.oxp)) || (meta.oyp != null && isFinite(meta.oyp));
-            if (hasPercent){
-              const x = (meta.oxp != null && isFinite(meta.oxp)) ? `calc(50% + ${meta.oxp}%)` : `calc(50% + ${(meta.ox||0)}px)`;
-              const y = (meta.oyp != null && isFinite(meta.oyp)) ? `calc(50% + ${meta.oyp}%)` : `calc(50% + ${(meta.oy||0)}px)`;
-              bg.style.backgroundPosition = `${x} ${y}`;
-            } else {
-              const ox = meta.ox||0; const oy = meta.oy||0;
-              bg.style.backgroundPosition = `calc(50% + ${ox}px) calc(50% + ${oy}px)`;
-            }
-          } else {
-             bg.style.backgroundSize = 'cover';
-             bg.style.backgroundPosition = 'center center';
-           }
-
-          holder.appendChild(bg);
+  const isMobile = window.matchMedia('(max-width: 960px)').matches;
+  const z = Math.max(1, Number((isMobile && isFinite(meta.zm)) ? meta.zm : (meta.z||1)));
+  bg.style.backgroundSize = `${Math.round(100*z)}%`;
+  const hasPercent = isMobile
+    ? ((meta.oxpm != null && isFinite(meta.oxpm)) || (meta.oypm != null && isFinite(meta.oypm)))
+    : ((meta.oxp  != null && isFinite(meta.oxp )) || (meta.oyp  != null && isFinite(meta.oyp )));
+  if (hasPercent){
+    const x = isMobile
+      ? `calc(50% + ${(meta.oxpm != null && isFinite(meta.oxpm)) ? meta.oxpm : 0}%)`
+      : `calc(50% + ${(meta.oxp  != null && isFinite(meta.oxp )) ? meta.oxp  : 0}%)`;
+    const y = isMobile
+      ? `calc(50% + ${(meta.oypm != null && isFinite(meta.oypm)) ? meta.oypm : 0}%)`
+      : `calc(50% + ${(meta.oyp  != null && isFinite(meta.oyp )) ? meta.oyp  : 0}%)`;
+    bg.style.backgroundPosition = `${x} ${y}`;
+  } else {
+    const ox = isMobile ? (meta.oxm || 0) : (meta.ox || 0);
+    const oy = isMobile ? (meta.oym || 0) : (meta.oy || 0);
+    bg.style.backgroundPosition = `calc(50% + ${ox}px) calc(50% + ${oy}px)`;
+  }
+} else {
+   bg.style.backgroundSize = 'cover';
+   bg.style.backgroundPosition = 'center center';
+}
+holder.appendChild(bg);
           art.appendChild(holder);
         }
 
@@ -445,3 +457,4 @@
   </div>
 </body>
 </html>
+

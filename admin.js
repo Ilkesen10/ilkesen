@@ -159,6 +159,8 @@ function applyInlineStyle(prop, val){
 
     // Email
     form.appendChild(inputEl('E‑posta', 'email', row.email||''));
+    form.appendChild(inputEl('Yeni Şifre', 'password1', '', 'password'));
+    form.appendChild(inputEl('Yeni Şifre (Tekrar)', 'password2', '', 'password'));
     // Roles (at least superadmin is supported by applyTabPermissions)
     const rolesLbl = document.createElement('div'); rolesLbl.style.display='grid'; rolesLbl.style.gap='6px'; rolesLbl.innerHTML='<span>Roller</span>';
     const rolesWrap = document.createElement('div'); rolesWrap.style.display='flex'; rolesWrap.style.flexWrap='wrap'; rolesWrap.style.gap='10px';
@@ -208,6 +210,10 @@ function applyInlineStyle(prop, val){
       e.preventDefault();
       const email = String(qs('input[name="email"]', form).value||'').trim();
       if (!email) return alert('E‑posta gerekli');
+      const pass1 = String(qs('input[name="password1"]', form)?.value||'').trim();
+      const pass2 = String(qs('input[name="password2"]', form)?.value||'').trim();
+      if ((pass1 || pass2) && pass1 !== pass2) return alert("Şifreler aynı değil");
+      if (pass1 && pass1.length < 8) return alert("Şifre en az 8 karakter olmalı");
       const selectedRoles = Array.from(rolesWrap.querySelectorAll('input[type="checkbox"]'))
         .filter(i=>i.checked).map(i=>i.value);
       const selectedTabs = Array.from(tabsWrap.querySelectorAll('input[type="checkbox"]'))
@@ -216,6 +222,21 @@ function applyInlineStyle(prop, val){
         const payload = { email, roles: selectedRoles, allowed_tabs: selectedTabs };
         const { error } = await sb().from('admin_users').upsert(payload, { onConflict:'email' });
         if (error) throw error;
+        if (pass1) {
+          try {
+            const { data: sess } = await sb().auth.getSession();
+            const token = sess?.session?.access_token || '';
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const { data: resp, error: funcErr } = await sb().functions.invoke("auth_admin", {
+              body: { action: "upsert_user", email, password: pass1 },
+              headers
+            });
+            if (funcErr) throw funcErr;
+            if (resp && resp.error) throw new Error(resp.error);
+          } catch (e) {
+            return alert("Şifre ayarlanamadı: " + (e?.message || String(e)));
+          }
+        }
         closeModal();
         if (typeof loadAdminUsers === 'function') await loadAdminUsers();
       }catch(err){ alert('Kaydedilemedi: ' + (err?.message||String(err))); }
@@ -428,18 +449,44 @@ function applyInlineStyle(prop, val){
     });
     return meta;
   }
-  function buildPhotoValue(key, meta){
-    const k = stripPhotoKey(key);
-    const z = (meta?.z ?? 1).toFixed(3);
-    const ox = Math.round(meta?.ox ?? 0);
-    const oy = Math.round(meta?.oy ?? 0);
-    const oxp = (meta?.oxp != null) ? Number(meta.oxp) : null;
-    const oyp = (meta?.oyp != null) ? Number(meta.oyp) : null;
-    const parts = [`z=${z}`, `ox=${ox}`, `oy=${oy}`];
-    if (oxp != null && isFinite(oxp)) parts.push(`oxp=${Math.round(oxp * 10) / 10}`);
-    if (oyp != null && isFinite(oyp)) parts.push(`oyp=${Math.round(oyp * 10) / 10}`);
-    return `${k}|${parts.join(',')}`;
+function parsePhotoMetaMobile(v){
+  const meta = { zm: 1.0, oxm: 0, oym: 0, oxpm: null, oypm: null };
+  if (!v) return meta;
+  const s = String(v);
+  const i = s.indexOf('|');
+  if (i < 0) return meta;
+  const tail = s.slice(i+1);
+  tail.split(',').forEach(p=>{
+    const [k, val] = p.split('=');
+    const n = Number(val);
+    if (k === 'zm' && isFinite(n)) meta.zm = n;
+    if (k === 'oxm' && isFinite(n)) meta.oxm = Math.round(n);
+    if (k === 'oym' && isFinite(n)) meta.oym = Math.round(n);
+    if (k === 'oxpm' && isFinite(n)) meta.oxpm = n;
+    if (k === 'oypm' && isFinite(n)) meta.oypm = n;
+  });
+  return meta;
+}  function buildPhotoValue(key, meta){
+  const k = stripPhotoKey(key);
+  const z = (meta?.z ?? 1).toFixed(3);
+  const ox = Math.round(meta?.ox ?? 0);
+  const oy = Math.round(meta?.oy ?? 0);
+  const oxp = (meta?.oxp != null) ? Number(meta.oxp) : null;
+  const oyp = (meta?.oyp != null) ? Number(meta.oyp) : null;
+  const parts = [`z=${z}`, `ox=${ox}`, `oy=${oy}`];
+  if (oxp != null && isFinite(oxp)) parts.push(`oxp=${Math.round(oxp * 10) / 10}`);
+  if (oyp != null && isFinite(oyp)) parts.push(`oyp=${Math.round(oyp * 10) / 10}`);
+  // Mobile-specific values (optional)
+  if (meta && (meta.zm != null || meta.oxm != null || meta.oym != null || meta.oxpm != null || meta.oypm != null)){
+    const zm = (meta?.zm ?? 1).toFixed(3);
+    const oxm = Math.round(meta?.oxm ?? 0);
+    const oym = Math.round(meta?.oym ?? 0);
+    parts.push(`zm=${zm}`, `oxm=${oxm}`, `oym=${oym}`);
+    if (meta?.oxpm != null && isFinite(meta.oxpm)) parts.push(`oxpm=${Math.round(meta.oxpm * 10) / 10}`);
+    if (meta?.oypm != null && isFinite(meta.oypm)) parts.push(`oypm=${Math.round(meta.oypm * 10) / 10}`);
   }
+  return `${k}|${parts.join(',')}`;
+}
 
   function openMemberModal(row){
     editing = { type:'member', id: row.id };
@@ -624,6 +671,7 @@ function applyInlineStyle(prop, val){
     // Kick off population
     populateProvincesAndDistricts();
     form.appendChild(inputEl('Çalıştığınız Kurum Tam Adı', 'institution_name', row.institution_name||''));
+    form.appendChild(inputEl('Görev yaptığı birim', 'work_unit', row.work_unit||''));
     // Corp
     form.appendChild(inputEl('Kurum Sicil No', 'corp_reg_no', row.corp_reg_no||''));
     form.appendChild(inputEl('Unvan', 'title', row.title||''));
@@ -662,42 +710,50 @@ function applyInlineStyle(prop, val){
     form.appendChild(inputEl('Üye Kayıt Tarihi', 'join_date', row.join_date||new Date().toISOString().slice(0,10), 'date'));
     form.appendChild(inputEl('Üyelikten Ayrılış Tarihi', 'leave_date', row.leave_date||'', 'date'));
     form.appendChild(selectEl('Durum', 'status', row.status||'active', [ {v:'active',t:'Aktif'}, {v:'passive',t:'Pasif'} ]));
-    // Files
-    const photoLabel = document.createElement('label'); photoLabel.style.display='grid'; photoLabel.style.gap='6px'; photoLabel.innerHTML = '<span>Fotoğraf</span>';
-    const photoPrev = document.createElement('img');
-    photoPrev.style.maxWidth = '160px';
-    photoPrev.style.maxHeight = '160px';
-    photoPrev.style.objectFit = 'cover';
-    photoPrev.style.borderRadius = '10px';
-    photoPrev.style.border = '1px solid #e5e7eb';
-    photoPrev.style.display = row.photo_url ? 'block' : 'none';
+        // Files
+    const photoLabel = document.createElement("label"); photoLabel.style.display="grid"; photoLabel.style.gap="6px"; photoLabel.innerHTML = "<span>Fotoğraf</span>";
+    const photoPrev = document.createElement("img");
+    photoPrev.style.maxWidth = "160px";
+    photoPrev.style.maxHeight = "160px";
+    photoPrev.style.objectFit = "cover";
+    photoPrev.style.borderRadius = "10px";
+    photoPrev.style.border = "1px solid #e5e7eb";
+    photoPrev.style.display = "block";
+    const genderSel = form.querySelector("select[name=\"gender\"]");
+    function __computeMemberFallbackByGender(){
+      const g = (genderSel && genderSel.value) || row.gender || "";
+      return /kadin|kadın|female/i.test(String(g)) ? "kadin.jpeg" : "erkek.jpeg";
+    }
     if (row.photo_url){
       // Resolve to signed URL if needed; avoid cache-busting on signed URLs
       resolveMemberPhotoUrl(row.photo_url).then(u=>{ photoPrev.src = u; }).catch(()=>{ try{ photoPrev.src = stripPhotoKey(row.photo_url); }catch{} });
+    } else {
+      try{ photoPrev.src = __computeMemberFallbackByGender(); }catch{}
     }
     photoLabel.appendChild(photoPrev);
-    const photoInput = document.createElement('input'); photoInput.type='file'; photoInput.accept='image/*'; photoLabel.appendChild(photoInput); form.appendChild(photoLabel);
+    photoPrev.addEventListener("error", ()=>{ try{ photoPrev.src = __computeMemberFallbackByGender(); photoPrev.style.display="block"; }catch{} });
+    const photoInput = document.createElement("input"); photoInput.type="file"; photoInput.accept="image/*"; photoLabel.appendChild(photoInput); form.appendChild(photoLabel);
     // Live preview on file select (does not upload yet)
-    photoInput.addEventListener('change', ()=>{
+    photoInput.addEventListener("change", ()=>{
       const f = photoInput.files && photoInput.files[0];
-      if (!f){ photoPrev.style.display='none'; photoPrev.removeAttribute('src'); return; }
+      if (!f){ try{ photoPrev.src = __computeMemberFallbackByGender(); photoPrev.style.display="block"; }catch{} return; }
       const url = URL.createObjectURL(f);
-      photoPrev.src = url; photoPrev.style.display='block';
+      photoPrev.src = url; photoPrev.style.display="block";
     });
     // Crop controls for ID card (circle) — uses data attributes read by save logic
-    const cropWrap = document.createElement('div'); cropWrap.className='card'; cropWrap.style.padding='10px'; cropWrap.style.display='grid'; cropWrap.style.gap='8px'; cropWrap.style.marginTop='8px';
-    const cropTitle = document.createElement('div'); cropTitle.textContent='Kimlik Fotoğraf Kadrajı'; cropTitle.style.fontWeight='600'; cropWrap.appendChild(cropTitle);
-    const initMeta = parsePhotoMeta(row.photo_url||'');
-    const zoomLbl = document.createElement('label'); zoomLbl.style.display='grid'; zoomLbl.style.gap='4px'; zoomLbl.innerHTML='<span>Yakınlık</span>';
-    const zoomRange = document.createElement('input'); zoomRange.type='range'; zoomRange.min='0.30'; zoomRange.max='2.00'; zoomRange.step='0.01'; zoomRange.value=String(initMeta.z||1); zoomRange.setAttribute('data-photo-zoom','1');
+    const cropWrap = document.createElement("div"); cropWrap.className="card"; cropWrap.style.padding="10px"; cropWrap.style.display="grid"; cropWrap.style.gap="8px"; cropWrap.style.marginTop="8px";
+    const cropTitle = document.createElement("div"); cropTitle.textContent="Kimlik Fotoğraf Kadrajı"; cropTitle.style.fontWeight="600"; cropWrap.appendChild(cropTitle);
+    const initMeta = parsePhotoMeta(row.photo_url||"");
+    const zoomLbl = document.createElement("label"); zoomLbl.style.display="grid"; zoomLbl.style.gap="4px"; zoomLbl.innerHTML="<span>Yakınlık</span>";
+    const zoomRange = document.createElement("input"); zoomRange.type="range"; zoomRange.min="0.30"; zoomRange.max="2.00"; zoomRange.step="0.01"; zoomRange.value=String(initMeta.z||1); zoomRange.setAttribute("data-photo-zoom","1");
     zoomLbl.appendChild(zoomRange); cropWrap.appendChild(zoomLbl);
-    const oyLbl = document.createElement('label'); oyLbl.style.display='grid'; oyLbl.style.gap='4px'; oyLbl.innerHTML='<span>Dikey Ofset</span>';
-    const oyRange = document.createElement('input'); oyRange.type='range'; oyRange.min='-160'; oyRange.max='160'; oyRange.step='1'; oyRange.value=String(initMeta.oy||0); oyRange.setAttribute('data-photo-oy','1');
+    const oyLbl = document.createElement("label"); oyLbl.style.display="grid"; oyLbl.style.gap="4px"; oyLbl.innerHTML="<span>Dikey Ofset</span>";
+    const oyRange = document.createElement("input"); oyRange.type="range"; oyRange.min="-160"; oyRange.max="160"; oyRange.step="1"; oyRange.value=String(initMeta.oy||0); oyRange.setAttribute("data-photo-oy","1");
     oyLbl.appendChild(oyRange); cropWrap.appendChild(oyLbl);
-    const oxLbl = document.createElement('label'); oxLbl.style.display='grid'; oxLbl.style.gap='4px'; oxLbl.innerHTML='<span>Yatay Ofset</span>';
-    const oxRange = document.createElement('input'); oxRange.type='range'; oxRange.min='-160'; oxRange.max='160'; oxRange.step='1'; oxRange.value=String(initMeta.ox||0); oxRange.setAttribute('data-photo-ox','1');
+    const oxLbl = document.createElement("label"); oxLbl.style.display="grid"; oxLbl.style.gap="4px"; oxLbl.innerHTML="<span>Yatay Ofset</span>";
+    const oxRange = document.createElement("input"); oxRange.type="range"; oxRange.min="-160"; oxRange.max="160"; oxRange.step="1"; oxRange.value=String(initMeta.ox||0); oxRange.setAttribute("data-photo-ox","1");
     oxLbl.appendChild(oxRange); cropWrap.appendChild(oxLbl);
-    const circPrev = document.createElement('canvas'); circPrev.width=160; circPrev.height=160; circPrev.style.borderRadius='50%'; circPrev.style.border='1px solid #e5e7eb'; cropWrap.appendChild(circPrev);
+    const circPrev = document.createElement("canvas"); circPrev.width=160; circPrev.height=160; circPrev.style.borderRadius="50%"; circPrev.style.border="1px solid #e5e7eb"; cropWrap.appendChild(circPrev);
     form.appendChild(cropWrap);
 
     let circImg = null;
@@ -705,22 +761,28 @@ function applyInlineStyle(prop, val){
       if (circImg) return circImg;
       try{
         if (photoInput.files && photoInput.files[0]){
-          circImg = await new Promise((res)=>{ const i=new Image(); i.onload=()=>res(i); try{i.src=URL.createObjectURL(photoInput.files[0]);}catch{res(null);} });
-          return circImg;
-        } else if (row.photo_url){
-          const u = await resolveMemberPhotoUrl(row.photo_url);
-          circImg = await new Promise((res)=>{ const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=()=>res(null); i.src=u; });
+          circImg = await new Promise((res)=>{ const i=new Image(); i.onload=()=>res(i); try{ i.src = URL.createObjectURL(photoInput.files[0]); }catch{ res(null);} });
           return circImg;
         }
+        if (row.photo_url){
+          try{
+            const u = await resolveMemberPhotoUrl(row.photo_url);
+            circImg = await new Promise((res)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=u; });
+            if (circImg) return circImg;
+          }catch{}
+        }
+        const fb = __computeMemberFallbackByGender();
+        circImg = await new Promise((res)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=fb; });
+        return circImg;
       }catch{}
       return null;
     }
     async function drawCircPrev(){
-      const ctx = circPrev.getContext('2d');
+      const ctx = circPrev.getContext("2d");
       ctx.clearRect(0,0,160,160);
       ctx.save(); ctx.beginPath(); ctx.arc(80,80,78,0,Math.PI*2); ctx.closePath(); ctx.clip();
       const img = await ensureCircImg();
-      if (!img){ ctx.fillStyle='#e5e7eb'; ctx.fillRect(0,0,160,160); ctx.restore(); return; }
+      if (!img){ ctx.fillStyle="#e5e7eb"; ctx.fillRect(0,0,160,160); ctx.restore(); return; }
       const R = 78; const baseScale = Math.max((R*2)/img.width, (R*2)/img.height);
       let scale = baseScale * Number(zoomRange.value||1);
       if (img.width*scale < R*2 || img.height*scale < R*2) scale = baseScale;
@@ -729,13 +791,20 @@ function applyInlineStyle(prop, val){
       const y = 80 - h/2 + Number(oyRange.value||0);
       try{ ctx.drawImage(img, x, y, w, h); }catch{}
       ctx.restore();
-      ctx.beginPath(); ctx.arc(80,80,78,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle='#0ea5b1'; ctx.lineWidth=3; ctx.stroke();
-      ctx.beginPath(); ctx.arc(80,80,72,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle='#fb923c'; ctx.lineWidth=2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(80,80,78,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle="#0ea5b1"; ctx.lineWidth=3; ctx.stroke();
+      ctx.beginPath(); ctx.arc(80,80,72,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle="#fb923c"; ctx.lineWidth=2; ctx.stroke();
     }
     drawCircPrev();
-    ;[zoomRange, oyRange, oxRange].forEach(el=> el.addEventListener('input', drawCircPrev));
-    photoInput.addEventListener('change', ()=>{ circImg=null; ensureCircImg().then(()=>drawCircPrev()); try{ if (photoInput.files && photoInput.files[0]){ photoPrev.src = URL.createObjectURL(photoInput.files[0]); photoPrev.style.display='block'; } }catch{} });
-    const docLabel = document.createElement('label'); docLabel.style.display='grid'; docLabel.style.gap='6px'; docLabel.innerHTML = '<span>Belgeler</span>';
+    [zoomRange, oyRange, oxRange].forEach(el=> el.addEventListener("input", drawCircPrev));
+    if (genderSel){
+      genderSel.addEventListener("change", ()=>{
+        if (!(photoInput.files && photoInput.files[0]) && !row.photo_url){
+          try{ photoPrev.src = __computeMemberFallbackByGender(); photoPrev.style.display="block"; }catch{}
+          circImg = null; ensureCircImg().then(()=>drawCircPrev());
+        }
+      });
+    }
+    photoInput.addEventListener("change", ()=>{ circImg=null; ensureCircImg().then(()=>drawCircPrev()); try{ if (photoInput.files && photoInput.files[0]){ photoPrev.src = URL.createObjectURL(photoInput.files[0]); photoPrev.style.display="block"; } }catch{} });const docLabel = document.createElement('label'); docLabel.style.display='grid'; docLabel.style.gap='6px'; docLabel.innerHTML = '<span>Belgeler</span>';
     const docInput = document.createElement('input'); docInput.type='file'; docInput.multiple=true; docLabel.appendChild(docInput); form.appendChild(docLabel);
 
     const docsPrev = document.createElement('div');
@@ -810,6 +879,7 @@ function applyInlineStyle(prop, val){
         work_province: null,
         work_district: null,
         institution_name: String(fd.get('institution_name')||'').trim(),
+        work_unit: String(fd.get('work_unit')||'').trim(),
         corp_reg_no: String(fd.get('corp_reg_no')||'').trim(),
         title: String(fd.get('title')||'').trim(),
         blood_type: String(fd.get('blood_type')||'').trim()||null,
@@ -1134,8 +1204,38 @@ await loadAdminMembers();
             // Draw the photo
             ctx.drawImage(ph, x, y, newWidth, newHeight);
           }
-          else { ctx.fillStyle='#e5e7eb'; ctx.fillRect(photoCX-photoR, photoCY-photoR, photoR*2, photoR*2); }
-        }catch{ ctx.fillStyle='#e5e7eb'; ctx.fillRect(photoCX-photoR, photoCY-photoR, photoR*2, photoR*2); }
+          else { try{ const g = String(member.gender||'').toLowerCase(); const fb = /kadin|kadın|female/.test(g) ? 'kadin.jpeg' : 'erkek.jpeg'; const ph = await loadImg(fb); const baseScale = Math.max((photoR*2)/ph.width, (photoR*2)/ph.height); const scale = baseScale; const newWidth = ph.width*scale; const newHeight = ph.height*scale; const x = photoCX - newWidth/2; const y = photoCY - newHeight/2; ctx.drawImage(ph, x, y, newWidth, newHeight); }catch{
+  try{
+    const g = String(member.gender||'').toLowerCase();
+    const fb = /kadin|kadın|female/.test(g) ? 'kadin.jpeg' : 'erkek.jpeg';
+    const ph = await loadImg(fb);
+    const baseScale = Math.max((photoR*2)/ph.width, (photoR*2)/ph.height);
+    const newWidth = ph.width*baseScale;
+    const newHeight = ph.height*baseScale;
+    const x = photoCX - newWidth/2;
+    const y = photoCY - newHeight/2;
+    ctx.drawImage(ph, x, y, newWidth, newHeight);
+  }catch{
+    ctx.fillStyle='#e5e7eb';
+    ctx.fillRect(photoCX-photoR, photoCY-photoR, photoR*2, photoR*2);
+  }
+}}
+        }catch{
+  try{
+    const g = String(member.gender||'').toLowerCase();
+    const fb = /kadin|kadın|female/.test(g) ? 'kadin.jpeg' : 'erkek.jpeg';
+    const ph = await loadImg(fb);
+    const baseScale = Math.max((photoR*2)/ph.width, (photoR*2)/ph.height);
+    const newWidth = ph.width*baseScale;
+    const newHeight = ph.height*baseScale;
+    const x = photoCX - newWidth/2;
+    const y = photoCY - newHeight/2;
+    ctx.drawImage(ph, x, y, newWidth, newHeight);
+  }catch{
+    ctx.fillStyle='#e5e7eb';
+    ctx.fillRect(photoCX-photoR, photoCY-photoR, photoR*2, photoR*2);
+  }
+}
         ctx.restore();
         // Ensure a visible circular frame on template mode as well
         if (!useVector){
@@ -1228,7 +1328,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         try{ window.__idcardLastPng = canvas.toDataURL('image/jpeg', 0.92); }catch{}
       })();
       function roundRect(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.save(); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath(); }
-      function loadImg(src){ return new Promise((res,rej)=>{ const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=rej; i.src=src; }); }
+      function loadImg(src){ return new Promise((res,rej)=>{ const i=new Image(); try{ if (/^https?:/i.test(String(src||''))){ const u = new URL(src, location.href); if (u.origin !== location.origin){ i.crossOrigin='anonymous'; } } }catch{} i.onload=()=>res(i); i.onerror=()=>rej(new Error('img load failed')); i.src=src; }); }
       function fileName(url){ try{ const u=new URL(url, location.origin); return u.pathname.split('/').pop()||'dosya'; }catch{ const parts=String(url||'').split('/'); return parts[parts.length-1]||'dosya'; } }
       function renderExistingDocs(){
         docsPrev.innerHTML='';
@@ -1703,7 +1803,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       if (error) throw error;
       (data||[]).forEach(row => {
         const tr = document.createElement('tr');
-        const thumb = row.image_url ? `<img src="${escapeHtml(bust(row.image_url))}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;vertical-align:middle"/>` : '';
+        const thumb = row.image_url ? `<img src="${escapeHtml(bust(row.image_url))}" alt=" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;vertical-align:middle"/>` : '';
         const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı', active:'Yayımlandı' };
         const statusTr = statusMap[String(row.status||'').toLowerCase()] || (row.status||'');
         tr.innerHTML = `
@@ -1749,7 +1849,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       if (error) throw error;
       (data||[]).forEach(row => {
         const tr = document.createElement('tr');
-        const thumb = row.image_url ? `<img src="${escapeHtml(bust(row.image_url))}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;vertical-align:middle"/>` : '';
+        const thumb = row.image_url ? `<img src="${escapeHtml(bust(row.image_url))}" alt=" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;vertical-align:middle"/>` : '';
         const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı', active:'Yayımlandı' };
         const statusTr = statusMap[String(row.status||'').toLowerCase()] || (row.status||'');
         tr.innerHTML = `
@@ -2084,15 +2184,12 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       const coverLbl = document.createElement('div'); coverLbl.className='card'; coverLbl.style.padding='10px'; coverLbl.style.display='grid'; coverLbl.style.gap='8px'; coverLbl.style.margin='8px 0';
       const coverTitle = document.createElement('div'); coverTitle.textContent = 'Kapak (Slider) Kadrajı'; coverTitle.style.fontWeight='600'; coverLbl.appendChild(coverTitle);
       const initCover = parsePhotoMeta(row.cover_image_url||'');
-      const cZoomLbl = document.createElement('label'); cZoomLbl.style.display='grid'; cZoomLbl.style.gap='4px'; cZoomLbl.innerHTML='<span>Yakınlık</span>';
-      const cZoom = document.createElement('input'); cZoom.type='range'; cZoom.min='1.00'; cZoom.max='3.00'; cZoom.step='0.01'; cZoom.value=Math.max(1, initCover.z || 1); cZoom.setAttribute('data-cover-zoom','1');
-      cZoomLbl.appendChild(cZoom); coverLbl.appendChild(cZoomLbl);
-      const cOyLbl = document.createElement('label'); cOyLbl.style.display='grid'; cOyLbl.style.gap='4px'; cOyLbl.innerHTML='<span>Dikey Ofset</span>';
-      const cOy = document.createElement('input'); cOy.type='range'; cOy.min='-400'; cOy.max='400'; cOy.step='1'; cOy.value=String(initCover.oy||0); cOy.setAttribute('data-cover-oy','1');
-      cOyLbl.appendChild(cOy); coverLbl.appendChild(cOyLbl);
-      const cOxLbl = document.createElement('label'); cOxLbl.style.display='grid'; cOxLbl.style.gap='4px'; cOxLbl.innerHTML='<span>Yatay Ofset</span>';
-      const cOx = document.createElement('input'); cOx.type='range'; cOx.min='-400'; cOx.max='400'; cOx.step='1'; cOx.value=String(initCover.ox||0); cOx.setAttribute('data-cover-ox','1');
-      cOxLbl.appendChild(cOx); coverLbl.appendChild(cOxLbl);
+          const cZoom = document.createElement('input'); cZoom.type='hidden'; cZoom.value = String(Math.max(1, initCover.z || 1).toFixed(2)); cZoom.setAttribute('data-cover-zoom','1');
+    const cOy = document.createElement('input'); cOy.type='hidden'; cOy.value = String(initCover.oy || 0); cOy.setAttribute('data-cover-oy','1');
+    const cOx = document.createElement('input'); cOx.type='hidden'; cOx.value = String(initCover.ox || 0); cOx.setAttribute('data-cover-ox','1');      const initCoverM = parsePhotoMetaMobile(row.cover_image_url||'');
+      const mZoom = document.createElement('input'); mZoom.type='hidden'; mZoom.value = String(Math.max(1, initCoverM.zm || 1).toFixed(2)); mZoom.setAttribute('data-m-zoom','1');
+      const mOy = document.createElement('input'); mOy.type='hidden'; mOy.value = String(initCoverM.oym || 0); mOy.setAttribute('data-m-oy','1');
+      const mOx = document.createElement('input'); mOx.type='hidden'; mOx.value = String(initCoverM.oxm || 0); mOx.setAttribute('data-m-ox','1');
       // Rectangular cover preview
       const coverPrev = document.createElement('div');
       coverPrev.style.width='100%';               // fill modal width
@@ -2110,29 +2207,73 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       coverBg.style.backgroundColor='#fff';
       coverPrev.appendChild(coverBg);
       coverLbl.appendChild(coverPrev);
+      // Mobile preview (approx. mobile slider aspect)
+      const mobileTitle = document.createElement('div'); mobileTitle.textContent = 'Mobil Önizleme'; mobileTitle.style.fontWeight='600'; coverLbl.appendChild(mobileTitle);
+      const coverPrevM = document.createElement('div');
+      coverPrevM.style.width = '100%';
+      coverPrevM.style.maxWidth='360px'; coverPrevM.style.margin='0 auto';
+      coverPrevM.style.height = '460px';
+      coverPrevM.style.border = '1px solid #e5e7eb';
+      coverPrevM.style.borderRadius = '10px';
+      coverPrevM.style.overflow = 'hidden';
+      coverPrevM.style.position = 'relative';
+      coverPrevM.style.background = '#fff';
+      const coverBgM = document.createElement('div');
+      coverBgM.style.position = 'absolute';
+      coverBgM.style.inset = '0';
+      coverBgM.style.backgroundRepeat = 'no-repeat';
+      coverBgM.style.backgroundColor = '#fff';
+      coverPrevM.appendChild(coverBgM);
+      coverLbl.appendChild(coverPrevM);
 
       function currentCoverBase(){
         if (iFile.files && iFile.files[0]){ try{ return URL.createObjectURL(iFile.files[0]); }catch{} }
         return (String(iIn.value||'').trim() || stripPhotoKey(row.cover_image_url||row.image_url||''));
       }
       function updateCoverPreview(){
-        const base = currentCoverBase();
-        if (!base){ coverPrev.style.display='none'; return; }
-        coverPrev.style.display='block';
-        coverBg.style.backgroundImage = `url(${base})`;
-        const z = Number(cZoom.value||1); const ox = Number(cOx.value||0); const oy = Number(cOy.value||0);
-        coverBg.style.backgroundSize = `${Math.max(100, Math.round(100*z))}%`;
-        const boxW = coverPrev && coverPrev.clientWidth ? coverPrev.clientWidth : 0;
-        const boxH = coverPrev && coverPrev.clientHeight ? coverPrev.clientHeight : 0;
-        if (boxW && boxH){
-          const oxp = Math.round((ox / boxW) * 1000) / 10; // 0.1% precision
-          const oyp = Math.round((oy / boxH) * 1000) / 10;
-          coverBg.style.backgroundPosition = `calc(50% + ${oxp}%) calc(50% + ${oyp}%)`;
-        } else {
-          coverBg.style.backgroundPosition = `calc(50% + ${ox}px) calc(50% + ${oy}px)`;
-        }
-      }
-      // === Slider kadraj aracı ===
+  const base = currentCoverBase();
+  if (!base){
+    coverPrev.style.display='none';
+    if (typeof coverPrevM!=='undefined') coverPrevM.style.display='none';
+    return;
+  }
+  coverPrev.style.display='block';
+  if (typeof coverPrevM!=='undefined') coverPrevM.style.display='block';
+  coverBg.style.backgroundImage = `url(${base})`;
+  if (typeof coverBgM!=='undefined') coverBgM.style.backgroundImage = `url(${base})`;
+  // Desktop crop
+  const zD = Number(cZoom.value||1);
+  const oxD = Number(cOx.value||0);
+  const oyD = Number(cOy.value||0);
+  const sizeD = `${Math.max(100, Math.round(100*zD))}%`;
+  coverBg.style.backgroundSize = sizeD;
+  const boxWD = coverPrev && coverPrev.clientWidth ? coverPrev.clientWidth : 0;
+  const boxHD = coverPrev && coverPrev.clientHeight ? coverPrev.clientHeight : 0;
+  if (boxWD && boxHD){
+    const oxp = Math.round((oxD / boxWD) * 1000) / 10;
+    const oyp = Math.round((oyD / boxHD) * 1000) / 10;
+    coverBg.style.backgroundPosition = `calc(50% + ${oxp}%) calc(50% + ${oyp}%)`;
+  } else {
+    coverBg.style.backgroundPosition = `calc(50% + ${oxD}px) calc(50% + ${oyD}px)`;
+  }
+  // Mobile crop (independent)
+  if (typeof coverBgM!=='undefined'){
+    const zM = (typeof mZoom!=='undefined' && mZoom.value) ? Number(mZoom.value) : zD;
+    const oxM = (typeof mOx!=='undefined' && mOx.value!=null) ? Number(mOx.value) : 0;
+    const oyM = (typeof mOy!=='undefined' && mOy.value!=null) ? Number(mOy.value) : 0;
+    const sizeM = `${Math.max(100, Math.round(100*zM))}%`;
+    coverBgM.style.backgroundSize = sizeM;
+    const boxWM = coverPrevM && coverPrevM.clientWidth ? coverPrevM.clientWidth : 0;
+    const boxHM = coverPrevM && coverPrevM.clientHeight ? coverPrevM.clientHeight : 0;
+    if (boxWM && boxHM){
+      const oxpm = Math.round((oxM / boxWM) * 1000) / 10;
+      const oypm = Math.round((oyM / boxHM) * 1000) / 10;
+      coverBgM.style.backgroundPosition = `calc(50% + ${oxpm}%) calc(50% + ${oypm}%)`;
+    } else {
+      coverBgM.style.backgroundPosition = `calc(50% + ${oxM}px) calc(50% + ${oyM}px)`;
+    }
+  }
+}// === Slider kadraj aracı ===
 (function(){
   function read(){ return { z:+cZoom.value||1, ox:+cOx.value||0, oy:+cOy.value||0 }; }
   function write(st){
@@ -2157,23 +2298,25 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
   coverLbl.appendChild(row);
   form.appendChild(coverLbl);    
 
-  /* — pan-zoom inline preview — */
-  let drag=false, sx=0, sy=0, ox0=0, oy0=0;
-  coverPrev.style.cursor='grab';
-  coverPrev.addEventListener('pointerdown',e=>{
-    drag=true; sx=e.clientX; sy=e.clientY;
-    const st=read(); ox0=st.ox; oy0=st.oy;
-    coverPrev.setPointerCapture(e.pointerId); coverPrev.style.cursor='grabbing';
-  });
-  coverPrev.addEventListener('pointermove',e=>{
-    if(!drag) return; write({ z:read().z, ox:ox0+e.clientX-sx, oy:oy0+e.clientY-sy });
-  });
-  coverPrev.addEventListener('pointerup',()=>{ drag=false; coverPrev.releasePointerCapture; coverPrev.style.cursor='grab'; });
-  coverPrev.addEventListener('wheel',e=>{
-    e.preventDefault();
-    const step=e.deltaY<0?0.08:-0.08;
-    write({ z:read().z+step, ox:read().ox, oy:read().oy });
-  },{passive:false});
+    /* — pan-zoom inline preview — */
+  function attachPanZoom(el){
+    let drag=false, sx=0, sy=0, ox0=0, oy0=0;
+    el.style.cursor='grab';
+    el.addEventListener('pointerdown',e=>{ drag=true; sx=e.clientX; sy=e.clientY; const st=read(); ox0=st.ox; oy0=st.oy; el.setPointerCapture(e.pointerId); el.style.cursor='grabbing'; });
+    el.addEventListener('pointermove',e=>{ if(!drag) return; write({ z:read().z, ox:ox0+e.clientX-sx, oy:oy0+e.clientY-sy }); });
+    el.addEventListener('pointerup',()=>{ drag=false; try{ el.releasePointerCapture && el.releasePointerCapture(); }catch{} el.style.cursor='grab'; });
+    el.addEventListener('wheel',e=>{ e.preventDefault(); const step=e.deltaY<0?0.08:-0.08; write({ z:read().z+step, ox:read().ox, oy:read().oy }); },{passive:false});
+  }
+  attachPanZoom(coverPrev);
+  function attachPanZoomMobile(el){
+    let drag=false, sx=0, sy=0, ox0=0, oy0=0;
+    el.style.cursor='grab';
+    el.addEventListener('pointerdown',e=>{ drag=true; sx=e.clientX; sy=e.clientY; const ox=Number((typeof mOx!=='undefined'&&mOx.value)||0); const oy=Number((typeof mOy!=='undefined'&&mOy.value)||0); ox0=ox; oy0=oy; el.setPointerCapture(e.pointerId); el.style.cursor='grabbing'; });
+    el.addEventListener('pointermove',e=>{ if(!drag) return; if(typeof mOx!=='undefined') mOx.value = String(Math.round(ox0 + e.clientX - sx)); if(typeof mOy!=='undefined') mOy.value = String(Math.round(oy0 + e.clientY - sy)); updateCoverPreview(); });
+    el.addEventListener('pointerup',()=>{ drag=false; try{ el.releasePointerCapture && el.releasePointerCapture(); }catch{} el.style.cursor='grab'; });
+    el.addEventListener('wheel',e=>{ e.preventDefault(); const step=e.deltaY<0?0.08:-0.08; if(typeof mZoom!=='undefined'){ const cur=Number(mZoom.value||1); mZoom.value = String(Math.max(1, Math.min(3, cur+step)).toFixed(2)); updateCoverPreview(); } },{passive:false});
+  }
+  if (typeof coverPrevM!=='undefined') attachPanZoomMobile(coverPrevM);
   btnCenter.onclick = ()=> write({ z:read().z, ox:0, oy:0 });
   btnReset .onclick = ()=> write({ z:1, ox:0, oy:0 });
 
@@ -2271,23 +2414,31 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
             catch(err){ return alert(String(err?.message||err)); }
           }
           // Determine cover crop meta
-          const coverMeta = { z:Number(cZoom.value||1), ox:Number(cOx.value||0), oy:Number(cOy.value||0) };
+          const coverMeta = { z:Number(cZoom.value||1), ox:Number(cOx.value||0), oy:Number(cOy.value||0) }; const coverMetaM = { zm:Number((typeof mZoom!=='undefined'&&mZoom.value)||coverMeta.z||1), oxm:Number((typeof mOx!=='undefined'&&mOx.value)||0), oym:Number((typeof mOy!=='undefined'&&mOy.value)||0) };
           // Compute percent-based offsets relative to the preview box for responsive parity
           try{
-            const boxW = coverPrev && coverPrev.clientWidth ? coverPrev.clientWidth : 0;
-            const boxH = coverPrev && coverPrev.clientHeight ? coverPrev.clientHeight : 0;
-            if (boxW && boxH){
-              coverMeta.oxp = Math.round((coverMeta.ox / boxW) * 1000) / 10; // 0.1% precision
-              coverMeta.oyp = Math.round((coverMeta.oy / boxH) * 1000) / 10;
-            }
-          }catch{}
+  const boxW = coverPrev && coverPrev.clientWidth ? coverPrev.clientWidth : 0;
+  const boxH = coverPrev && coverPrev.clientHeight ? coverPrev.clientHeight : 0;
+  if (boxW && boxH){
+    coverMeta.oxp = Math.round((coverMeta.ox / boxW) * 1000) / 10; // 0.1% precision
+    coverMeta.oyp = Math.round((coverMeta.oy / boxH) * 1000) / 10;
+  }
+  if (typeof coverPrevM!=='undefined'){
+    const boxWM = coverPrevM && coverPrevM.clientWidth ? coverPrevM.clientWidth : 0;
+    const boxHM = coverPrevM && coverPrevM.clientHeight ? coverPrevM.clientHeight : 0;
+    if (boxWM && boxHM){
+      coverMetaM.oxpm = Math.round((coverMetaM.oxm / boxWM) * 1000) / 10;
+      coverMetaM.oypm = Math.round((coverMetaM.oym / boxHM) * 1000) / 10;
+    }
+  }
+}catch{}
           // If no new file, still save crop meta referencing existing image_url (or keep previous cover if none)
           if (!payload.image_url){
             const base = String(payload.image_url||'').trim() || stripPhotoKey(row.cover_image_url||row.image_url||'');
-            if (base){ payload.cover_image_url = buildPhotoValue(base, coverMeta); }
+            if (base){ payload.cover_image_url = buildPhotoValue(base, Object.assign({}, coverMeta, coverMetaM)); }
           } else {
             // Also set cover from uploaded
-            if (payload.image_url){ payload.cover_image_url = buildPhotoValue(payload.image_url, coverMeta); }
+            if (payload.image_url){ payload.cover_image_url = buildPhotoValue(payload.image_url, Object.assign({}, coverMeta, coverMetaM)); }
           }
           try{
             const parsed = JSON.parse(String(gIn.value||'[]'));
@@ -2316,8 +2467,18 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       const tb=document.createElement('div'); tb.style.display='flex'; tb.style.gap='6px'; tb.style.flexWrap='wrap'; tb.style.margin='6px 0';
       function mkBtn(txt, title, fn){ const btn=document.createElement('button'); btn.type='button'; btn.className='btn btn-outline'; btn.textContent=txt; btn.title=title; btn.style.padding='6px 10px'; btn.addEventListener('click', fn); return btn; }
       function selWrap(before, after=''){ const s=bIn.selectionStart||0, e=bIn.selectionEnd||0; const v=bIn.value; const picked=v.slice(s,e); const rep=before+picked+(after||before); bIn.setRangeText(rep, s, e, 'end'); bIn.focus(); renderPrev(); }
-      function selLinePrefix(prefix){ const s=bIn.selectionStart||0, e=bIn.selectionEnd||0; const v=bIn.value; const start=v.lastIndexOf('\n', s-1)+1; const end=e; const lines=v.slice(start,end).split('\n').map(l=> prefix+ l); const rep=lines.join('\n'); bIn.setSelectionRange(start,end); bIn.setRangeText(rep, start, end, 'end'); bIn.focus(); renderPrev(); }
-      tb.appendChild(mkBtn('B','Kalın', ()=> selWrap('**','**')));
+      function selLinePrefix(prefix){
+  const s = bIn.selectionStart||0, e = bIn.selectionEnd||0;
+  const v = bIn.value;
+  const start = v.lastIndexOf('\n', s-1) + 1;
+  const end = e;
+  const lines = v.slice(start, end).split('\n').map(l => prefix + l);
+  const rep = lines.join('\n');
+  bIn.setSelectionRange(start, end);
+  bIn.setRangeText(rep, start, end, 'end');
+  bIn.focus();
+  renderPrev();
+}tb.appendChild(mkBtn('B','Kalın', ()=> selWrap('**','**')));
       tb.appendChild(mkBtn('I','İtalik', ()=> selWrap('*','*')));
       tb.appendChild(mkBtn('H2','Başlık', ()=> selLinePrefix('## ')));
       tb.appendChild(mkBtn('•','Liste', ()=> selLinePrefix('- ')));
@@ -2943,8 +3104,8 @@ async function loadAdminChairman(){
 
    // Önizleme
    const prevCanvas = document.createElement('canvas');
-   prevCanvas.width = 200;
-   prevCanvas.height = 200;
+   prevCanvas.width = 240;
+   prevCanvas.height = 320;
    prevCanvas.style.border = '1px solid #e5e7eb';
    prevCanvas.style.borderRadius = '10px';
    left.appendChild(prevCanvas);
@@ -2967,23 +3128,20 @@ async function loadAdminChairman(){
    }
 
    async function drawPrev(){
-     const ctx = prevCanvas.getContext('2d');
-     ctx.clearRect(0,0,prevCanvas.width,prevCanvas.height);
-     const img = await ensurePrevImg();
-     if (!img){ ctx.fillStyle='#e5e7eb'; ctx.fillRect(0,0,prevCanvas.width,prevCanvas.height); ctx.restore(); return; }
-     const R = 78; const baseScale = Math.max((R*2)/img.width, (R*2)/img.height);
-     let scale = baseScale * Number(zRange.value||1);
-     if (img.width*scale < R*2 || img.height*scale < R*2) scale = baseScale;
-     const w = img.width*scale, h = img.height*scale;
-     const x = 80 - w/2 + Number(oxRange.value||0);
-     const y = 80 - h/2 + Number(oyRange.value||0);
-     try{ ctx.drawImage(img, x, y, w, h); }catch{}
-     ctx.restore();
-     ctx.beginPath(); ctx.arc(80,80,78,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle='#0ea5b1'; ctx.lineWidth=3; ctx.stroke();
-     ctx.beginPath(); ctx.arc(80,80,72,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle='#fb923c'; ctx.lineWidth=2; ctx.stroke();
-   }
-
-   drawPrev();
+  const ctx = prevCanvas.getContext('2d');
+  ctx.clearRect(0,0,prevCanvas.width,prevCanvas.height);
+  const img = await ensurePrevImg();
+  if (!img){ ctx.fillStyle='#e5e7eb'; ctx.fillRect(0,0,prevCanvas.width,prevCanvas.height); return; }
+  // Scale to cover the canvas (rectangular), then apply user zoom
+  const baseScale = Math.max(prevCanvas.width / img.width, prevCanvas.height / img.height);
+  let scale = Math.max(baseScale, baseScale * Number(zRange.value||1));
+  const w = img.width * scale, h = img.height * scale;
+  const cx = prevCanvas.width/2, cy = prevCanvas.height/2;
+  const x = cx - w/2 + Number(oxRange.value||0);
+  const y = cy - h/2 + Number(oyRange.value||0);
+  try{ ctx.drawImage(img, x, y, w, h); }catch{}
+}
+  drawPrev();
 
    zRange.addEventListener('input', drawPrev);
    oxRange.addEventListener('input', drawPrev);
@@ -3237,8 +3395,8 @@ function openFounderModal(row){
 
    // Önizleme
    const prevCanvas = document.createElement('canvas');
-   prevCanvas.width = 200;
-   prevCanvas.height = 200;
+   prevCanvas.width = 240;
+   prevCanvas.height = 320;
    prevCanvas.style.border = '1px solid #e5e7eb';
    prevCanvas.style.borderRadius = '10px';
    cropWrap.appendChild(prevCanvas);
@@ -3261,23 +3419,20 @@ function openFounderModal(row){
    }
 
    async function drawPrev(){
-     const ctx = prevCanvas.getContext('2d');
-     ctx.clearRect(0,0,prevCanvas.width,prevCanvas.height);
-     const img = await ensurePrevImg();
-     if (!img){ ctx.fillStyle='#e5e7eb'; ctx.fillRect(0,0,prevCanvas.width,prevCanvas.height); ctx.restore(); return; }
-     const R = 78; const baseScale = Math.max((R*2)/img.width, (R*2)/img.height);
-     let scale = baseScale * Number(zRange.value||1);
-     if (img.width*scale < R*2 || img.height*scale < R*2) scale = baseScale;
-     const w = img.width*scale, h = img.height*scale;
-     const x = 80 - w/2 + Number(oxRange.value||0);
-     const y = 80 - h/2 + Number(oyRange.value||0);
-     try{ ctx.drawImage(img, x, y, w, h); }catch{}
-     ctx.restore();
-     ctx.beginPath(); ctx.arc(80,80,78,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle='#0ea5b1'; ctx.lineWidth=3; ctx.stroke();
-     ctx.beginPath(); ctx.arc(80,80,72,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle='#fb923c'; ctx.lineWidth=2; ctx.stroke();
-   }
-
-   drawPrev();
+  const ctx = prevCanvas.getContext('2d');
+  ctx.clearRect(0,0,prevCanvas.width,prevCanvas.height);
+  const img = await ensurePrevImg();
+  if (!img){ ctx.fillStyle='#e5e7eb'; ctx.fillRect(0,0,prevCanvas.width,prevCanvas.height); return; }
+  // Scale to cover the canvas (rectangular), then apply user zoom
+  const baseScale = Math.max(prevCanvas.width / img.width, prevCanvas.height / img.height);
+  let scale = Math.max(baseScale, baseScale * Number(zRange.value||1));
+  const w = img.width * scale, h = img.height * scale;
+  const cx = prevCanvas.width/2, cy = prevCanvas.height/2;
+  const x = cx - w/2 + Number(oxRange.value||0);
+  const y = cy - h/2 + Number(oyRange.value||0);
+  try{ ctx.drawImage(img, x, y, w, h); }catch{}
+}
+  drawPrev();
 
    zRange.addEventListener('input', drawPrev);
    oxRange.addEventListener('input', drawPrev);
@@ -3360,6 +3515,26 @@ function openFounderModal(row){
  }
 }
 })();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

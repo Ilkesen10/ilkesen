@@ -17,6 +17,12 @@
       }catch(e){}
     })();
   </script>
+  <script>
+    // Early: strip any query parameters (never keep email/password in URL)
+    (function(){
+      try{ if (location.search) history.replaceState(null, '', location.pathname + location.hash); }catch(e){}
+    })();
+  </script>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" href="ilkesen.jpg" type="image/jpeg" />
   <link rel="stylesheet" href="styles.css" />
