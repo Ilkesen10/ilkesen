@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 (function(){
   const sb = () => window.ilkeSupabase;
@@ -78,7 +78,7 @@ function applyInlineStyle(prop, val){
   // ========== USERS (RBAC) ==========
   async function loadAdminUsers(){
     const tbody = $usersTBody(); if (!tbody) return;
-    tbody.innerHTML='';
+    tbody.innerHTML= '';
     try{
       const { data, error } = await sb().from('admin_users').select('email, roles, allowed_tabs').order('email');
       if (error) throw error;
@@ -89,7 +89,7 @@ function applyInlineStyle(prop, val){
         const tabs = Array.isArray(row.allowed_tabs)
           ? row.allowed_tabs.map(t => tabNames[t] || t).join(', ')
           : '';
-        tr.innerHTML = `<td>${escapeHtml(row.email||'')}</td><td>${escapeHtml(roles)}</td><td>${escapeHtml(tabs)}</td><td class="actions"><button class="btn btn-warning" data-edit-user="${row.email}">Düzenle</button><button class="btn btn-danger" data-del-user="${row.email}">Sil</button></td>`;
+        tr.innerHTML = `<td>${escapeHtml(row.email|| '')}</td><td>${escapeHtml(roles)}</td><td>${escapeHtml(tabs)}</td><td class="actions"><button class="btn btn-warning" data-edit-user="${row.email}">Düzenle</button><button class="btn btn-danger" data-del-user="${row.email}">Sil</button></td>`;
         tbody.appendChild(tr);
       });
       wireUsersRowActions();
@@ -121,7 +121,7 @@ function applyInlineStyle(prop, val){
   function openUserModal(row){
     editing = { type:'user', id: row.email };
     $modalTitle().textContent = row.email ? 'Kullanıcıyı Düzenle' : 'Yeni Kullanıcı';
-    $modalForm().innerHTML='';
+    $modalForm().innerHTML= '';
     const form = $modalForm();
 
     // Helpers for building labeled inputs/selects
@@ -158,7 +158,7 @@ function applyInlineStyle(prop, val){
     }
 
     // Email
-    form.appendChild(inputEl('E‑posta', 'email', row.email||''));
+    form.appendChild(inputEl('E‑posta', 'email', row.email|| ''));
     form.appendChild(inputEl('Yeni Şifre', 'password1', '', 'password'));
     form.appendChild(inputEl('Yeni Şifre (Tekrar)', 'password2', '', 'password'));
     // Roles (at least superadmin is supported by applyTabPermissions)
@@ -208,10 +208,10 @@ function applyInlineStyle(prop, val){
     cancelBtn.addEventListener('click', (e)=>{ e.preventDefault(); closeModal(); });
     saveBtn.addEventListener('click', async (e)=>{
       e.preventDefault();
-      const email = String(qs('input[name="email"]', form).value||'').trim();
+      const email = String(qs('input[name="email"]', form).value|| '').trim();
       if (!email) return alert('E‑posta gerekli');
-      const pass1 = String(qs('input[name="password1"]', form)?.value||'').trim();
-      const pass2 = String(qs('input[name="password2"]', form)?.value||'').trim();
+      const pass1 = String(qs('input[name="password1"]', form)?.value|| '').trim();
+      const pass2 = String(qs('input[name="password2"]', form)?.value|| '').trim();
       if ((pass1 || pass2) && pass1 !== pass2) return alert("Şifreler aynı değil");
       if (pass1 && pass1.length < 8) return alert("Şifre en az 8 karakter olmalı");
       const selectedRoles = Array.from(rolesWrap.querySelectorAll('input[type="checkbox"]'))
@@ -268,7 +268,7 @@ function applyInlineStyle(prop, val){
       }
     }catch{}
 
-    tbody.innerHTML='';
+    tbody.innerHTML= '';
     try{
       const term = (qs('#membersSearchInput')?.value || '').trim();
       let q = sb().from('members').select('id, member_no, first_name, last_name, national_id, email, phone, status, join_date').order('member_no');
@@ -282,16 +282,16 @@ function applyInlineStyle(prop, val){
       if (error) throw error;
       (data||[]).forEach(row=>{
         const tr=document.createElement('tr');
-        const name = `${escapeHtml(row.first_name||'')} ${escapeHtml(row.last_name||'')}`.trim();
+        const name = `${escapeHtml(row.first_name|| '')} ${escapeHtml(row.last_name|| '')}`.trim();
         const status = row.status || 'active';
         const statusTr = status === 'active' ? 'Aktif' : 'Pasif';
         const toggleText = status === 'active' ? 'Pasife Al' : 'Aktife Al';
         const jd = row.join_date ? new Date(row.join_date).toLocaleDateString('tr-TR') : '-';
         tr.innerHTML = `
           <td>${row.member_no||'-'}</td>
-          <td>${name}<div class="muted" style="font-size:12px">${escapeHtml(row.national_id||'')}</div></td>
-          <td>${escapeHtml(row.email||'')}</td>
-          <td>${escapeHtml(row.phone||'')}</td>
+          <td>${name}<div class="muted" style="font-size:12px">${escapeHtml(row.national_id|| '')}</div></td>
+          <td>${escapeHtml(row.email|| '')}</td>
+          <td>${escapeHtml(row.phone|| '')}</td>
           <td>${escapeHtml(statusTr)}</td>
           <td>${jd}</td>
           <td class="actions">
@@ -360,7 +360,7 @@ function applyInlineStyle(prop, val){
   async function uploadToBucket(file, filePath) {
     try {
       // Normalize path: remove leading slashes and accidental bucket prefix
-      const cleanPath = filePath.replace(/^\/+/, '').replace(/^member-photos\//, '');
+      const cleanPath = filePath.replace(/^\/+/, ').replace(/^member-photos\//, ');
       
       // Upload to the root (or given subfolder) of the bucket
       const { error } = await sb()
@@ -491,7 +491,7 @@ function parsePhotoMetaMobile(v){
   function openMemberModal(row){
     editing = { type:'member', id: row.id };
     $modalTitle().textContent = row.id ? 'Üyeyi Düzenle' : 'Yeni Üye';
-    $modalForm().innerHTML='';
+    $modalForm().innerHTML= '';
     const form = $modalForm();
 
     // Helpers for building labeled inputs/selects
@@ -528,14 +528,14 @@ function parsePhotoMetaMobile(v){
     }
 
     // Identity
-    form.appendChild(inputEl('Ad', 'first_name', row.first_name||''));
-    form.appendChild(inputEl('Soyad', 'last_name', row.last_name||''));
-    form.appendChild(inputEl('TC Kimlik No', 'national_id', row.national_id||''));
+    form.appendChild(inputEl('Ad', 'first_name', row.first_name|| ''));
+    form.appendChild(inputEl('Soyad', 'last_name', row.last_name|| ''));
+    form.appendChild(inputEl('TC Kimlik No', 'national_id', row.national_id|| ''));
     // Family
-    form.appendChild(inputEl('Baba Adı', 'father_name', row.father_name||''));
-    form.appendChild(inputEl('Anne Adı', 'mother_name', row.mother_name||''));
+    form.appendChild(inputEl('Baba Adı', 'father_name', row.father_name|| ''));
+    form.appendChild(inputEl('Anne Adı', 'mother_name', row.mother_name|| ''));
     // Birth
-    form.appendChild(inputEl('Doğum Yeri', 'birth_place', row.birth_place||''));
+    form.appendChild(inputEl('Doğum Yeri', 'birth_place', row.birth_place|| ''));
     form.appendChild(inputEl('Doğum Tarihi', 'birth_date', row.birth_date||'', 'date'));
     // Personal
     form.appendChild(selectEl('Cinsiyet', 'gender', row.gender||'', [ {v:'',t:'Seçiniz'}, {v:'erkek',t:'Erkek'}, {v:'kadin',t:'Kadın'} ]));
@@ -628,17 +628,17 @@ function parsePhotoMetaMobile(v){
       try{
         const provs = await fetchProvinces();
         provSel.innerHTML = '';
-        const optNone = document.createElement('option'); optNone.value=''; optNone.textContent='İl Seçiniz'; provSel.appendChild(optNone);
-        (provs||[]).forEach(p=>{ const o=document.createElement('option'); o.value=String(p.id); o.textContent=p.name; o.dataset.plate = String(p.plate_code||p.plate||''); provSel.appendChild(o); });
+        const optNone = document.createElement('option'); optNone.value= ''; optNone.textContent='İl Seçiniz'; provSel.appendChild(optNone);
+        (provs||[]).forEach(p=>{ const o=document.createElement('option'); o.value=String(p.id); o.textContent=p.name; o.dataset.plate = String(p.plate_code||p.plate|| ''); provSel.appendChild(o); });
         // Preselect by name if row has stored province name
         if (row.work_province){
-          const found = (provs||[]).find(p=> String(p.name||'').toLowerCase() === String(row.work_province||'').toLowerCase());
+          const found = (provs||[]).find(p=> String(p.name|| '').toLowerCase() === String(row.work_province|| '').toLowerCase());
           if (found) provSel.value = String(found.id);
         }
         // Load districts for selected province
         async function loadDistrictsForSelected(){
-          distSel.innerHTML='';
-          const o0=document.createElement('option'); o0.value=''; o0.textContent='İlçe Seçiniz'; distSel.appendChild(o0);
+          distSel.innerHTML= '';
+          const o0=document.createElement('option'); o0.value= ''; o0.textContent='İlçe Seçiniz'; distSel.appendChild(o0);
           const selOpt = provSel.selectedOptions && provSel.selectedOptions[0];
           const pid = provSel.value;
           const plate = selOpt ? (selOpt.dataset.plate || '') : '';
@@ -657,10 +657,10 @@ function parsePhotoMetaMobile(v){
           }
           (dists||[]).forEach(d=>{ const o=document.createElement('option'); o.value=String(d.id); o.textContent=d.name; distSel.appendChild(o); });
           if (!dists || !dists.length){
-            const o=document.createElement('option'); o.value=''; o.textContent='(İlçeler yüklenemedi)'; distSel.appendChild(o);
+            const o=document.createElement('option'); o.value= ''; o.textContent='(İlçeler yüklenemedi)'; distSel.appendChild(o);
           }
           if (row.work_district){
-            const foundD = (dists||[]).find(d=> String(d.name||'').toLowerCase() === String(row.work_district||'').toLowerCase());
+            const foundD = (dists||[]).find(d=> String(d.name|| '').toLowerCase() === String(row.work_district|| '').toLowerCase());
             if (foundD) distSel.value = String(foundD.id);
           }
         }
@@ -670,18 +670,18 @@ function parsePhotoMetaMobile(v){
     }
     // Kick off population
     populateProvincesAndDistricts();
-    form.appendChild(inputEl('Çalıştığınız Kurum Tam Adı', 'institution_name', row.institution_name||''));
-    form.appendChild(inputEl('Görev yaptığı birim', 'work_unit', row.work_unit||''));
+    form.appendChild(inputEl('Çalıştığınız Kurum Tam Adı', 'institution_name', row.institution_name|| ''));
+    form.appendChild(inputEl('Görev yaptığı birim', 'work_unit', row.work_unit|| ''));
     // Corp
-    form.appendChild(inputEl('Kurum Sicil No', 'corp_reg_no', row.corp_reg_no||''));
-    form.appendChild(inputEl('Unvan', 'title', row.title||''));
+    form.appendChild(inputEl('Kurum Sicil No', 'corp_reg_no', row.corp_reg_no|| ''));
+    form.appendChild(inputEl('Unvan', 'title', row.title|| ''));
     form.appendChild(selectEl('Kan Grubu', 'blood_type', row.blood_type||'', [ {v:'',t:'Seçiniz'},{v:'0 Rh+',t:'0 Rh+'},{v:'0 Rh-',t:'0 Rh-'},{v:'A Rh+',t:'A Rh+'},{v:'A Rh-',t:'A Rh-'},{v:'B Rh+',t:'B Rh+'},{v:'B Rh-',t:'B Rh-'},{v:'AB Rh+',t:'AB Rh+'},{v:'AB Rh-',t:'AB Rh-'} ]));
     // Other
-    form.appendChild(inputEl('Emekli Sandığı Sicil No', 'retirement_no', row.retirement_no||''));
-    form.appendChild(inputEl('SSK No', 'ssk_no', row.ssk_no||''));
+    form.appendChild(inputEl('Emekli Sandığı Sicil No', 'retirement_no', row.retirement_no|| ''));
+    form.appendChild(inputEl('SSK No', 'ssk_no', row.ssk_no|| ''));
     // Contact
-    form.appendChild(inputEl('E-posta', 'email', row.email||''));
-    const phoneInput = inputEl('Telefon (5XX...)', 'phone', row.phone||'');
+    form.appendChild(inputEl('E-posta', 'email', row.email|| ''));
+    const phoneInput = inputEl('Telefon (5XX...)', 'phone', row.phone|| '');
     form.appendChild(phoneInput);
     // Phone input mask: (XXX) XXX XX XX (visual only)
     try{
@@ -693,7 +693,7 @@ function parsePhotoMetaMobile(v){
         phoneEl.maxLength = 20;
         try{ phoneEl.setAttribute('inputmode','tel'); phoneEl.autocomplete='off'; }catch{}
         phoneEl.addEventListener('input', ()=>{
-          let d = String(phoneEl.value||'').replace(/\D/g,'');
+          let d = String(phoneEl.value|| '').replace(/\D/g,'');
           if (d.startsWith('90')) d = d.slice(2);
           if (d.startsWith('0')) d = d.slice(1);
           d = d.slice(0,10);
@@ -813,15 +813,15 @@ function parsePhotoMetaMobile(v){
     docsPrev.style.gap='8px';
     docsPrev.style.margin='6px 0 10px';
     form.appendChild(docsPrev);
-    function isImg(url){ return /(\.png|\.jpe?g|\.gif|\.webp|\.bmp|\.svg)$/i.test(String(url||'')); }
-    function fileName(url){ try{ const u=new URL(url, location.origin); return u.pathname.split('/').pop()||'dosya'; }catch{ const parts=String(url||'').split('/'); return parts[parts.length-1]||'dosya'; } }
+    function isImg(url){ return /(\.png|\.jpe?g|\.gif|\.webp|\.bmp|\.svg)$/i.test(String(url|| '')); }
+    function fileName(url){ try{ const u=new URL(url, location.origin); return u.pathname.split('/').pop()||'dosya'; }catch{ const parts=String(url|| '').split('/'); return parts[parts.length-1]||'dosya'; } }
     function renderExistingDocs(){
-      docsPrev.innerHTML='';
+      docsPrev.innerHTML= '';
       let arr=[]; try{ arr = JSON.parse(row.documents_urls||'[]'); if(!Array.isArray(arr)) arr=[]; }catch{}
       arr.forEach(url=>{
         const card = document.createElement('div'); card.className='card'; card.style.padding='6px'; card.style.display='flex'; card.style.flexDirection='column'; card.style.gap='6px';
         if (isImg(url)){
-          const img = document.createElement('img'); img.alt=''; img.style.width='100%'; img.style.height='86px'; img.style.objectFit='cover'; img.style.borderRadius='8px';
+          const img = document.createElement('img'); img.alt= ''; img.style.width='100%'; img.style.height='86px'; img.style.objectFit='cover'; img.style.borderRadius='8px';
           img.src = bust(url);
           card.appendChild(img);
         } else {
@@ -836,12 +836,12 @@ function parsePhotoMetaMobile(v){
     docsNewPrev.style.display='grid'; docsNewPrev.style.gridTemplateColumns='repeat(auto-fill, minmax(120px, 1fr))'; docsNewPrev.style.gap='8px';
     form.appendChild(docsNewPrevTitle); form.appendChild(docsNewPrev);
     function renderNewDocs(files){
-      docsNewPrev.innerHTML='';
+      docsNewPrev.innerHTML= '';
       const fs = Array.from(files||[]);
       fs.forEach(f=>{
         const card = document.createElement('div'); card.className='card'; card.style.padding='6px'; card.style.display='flex'; card.style.flexDirection='column'; card.style.gap='6px';
         if (/^image\//i.test(f.type)){
-          const img = document.createElement('img'); img.alt=''; img.style.width='100%'; img.style.height='86px'; img.style.objectFit='cover'; img.style.borderRadius='8px';
+          const img = document.createElement('img'); img.alt= ''; img.style.width='100%'; img.style.height='86px'; img.style.objectFit='cover'; img.style.borderRadius='8px';
           try{ img.src = URL.createObjectURL(f); }catch{}
           card.appendChild(img);
         } else {
@@ -866,29 +866,29 @@ function parsePhotoMetaMobile(v){
       e.preventDefault();
       const fd=new FormData(form);
       const payload={
-        first_name: String(fd.get('first_name')||'').trim(),
-        last_name: String(fd.get('last_name')||'').trim(),
-        national_id: String(fd.get('national_id')||'').trim(),
-        father_name: String(fd.get('father_name')||'').trim(),
-        mother_name: String(fd.get('mother_name')||'').trim(),
-        birth_place: String(fd.get('birth_place')||'').trim(),
-        birth_date: String(fd.get('birth_date')||'').trim() || null,
-        gender: String(fd.get('gender')||'').trim()||null,
-        education: String(fd.get('education')||'').trim()||null,
+        first_name: String(fd.get('first_name')|| '').trim(),
+        last_name: String(fd.get('last_name')|| '').trim(),
+        national_id: String(fd.get('national_id')|| '').trim(),
+        father_name: String(fd.get('father_name')|| '').trim(),
+        mother_name: String(fd.get('mother_name')|| '').trim(),
+        birth_place: String(fd.get('birth_place')|| '').trim(),
+        birth_date: String(fd.get('birth_date')|| '').trim() || null,
+        gender: String(fd.get('gender')|| '').trim()||null,
+        education: String(fd.get('education')|| '').trim()||null,
         // Convert selected province/district IDs to names for storage
         work_province: null,
         work_district: null,
-        institution_name: String(fd.get('institution_name')||'').trim(),
-        work_unit: String(fd.get('work_unit')||'').trim(),
-        corp_reg_no: String(fd.get('corp_reg_no')||'').trim(),
-        title: String(fd.get('title')||'').trim(),
-        blood_type: String(fd.get('blood_type')||'').trim()||null,
-        retirement_no: String(fd.get('retirement_no')||'').trim(),
-        ssk_no: String(fd.get('ssk_no')||'').trim(),
-        email: String(fd.get('email')||'').trim().toLowerCase() || null, // Normalize optional email: lowercase and send null if empty
-        phone: String(fd.get('phone')||'').trim(),
-        join_date: String(fd.get('join_date')||'').trim() || new Date().toISOString().slice(0,10),
-        leave_date: String(fd.get('leave_date')||'').trim() || null,
+        institution_name: String(fd.get('institution_name')|| '').trim(),
+        work_unit: String(fd.get('work_unit')|| '').trim(),
+        corp_reg_no: String(fd.get('corp_reg_no')|| '').trim(),
+        title: String(fd.get('title')|| '').trim(),
+        blood_type: String(fd.get('blood_type')|| '').trim()||null,
+        retirement_no: String(fd.get('retirement_no')|| '').trim(),
+        ssk_no: String(fd.get('ssk_no')|| '').trim(),
+        email: String(fd.get('email')|| '').trim().toLowerCase() || null, // Normalize optional email: lowercase and send null if empty
+        phone: String(fd.get('phone')|| '').trim(),
+        join_date: String(fd.get('join_date')|| '').trim() || new Date().toISOString().slice(0,10),
+        leave_date: String(fd.get('leave_date')|| '').trim() || null,
         status: String(fd.get('status')||'active')
       };
       // Generic cleanup: convert empty strings to null to avoid DB CHECK issues
@@ -907,7 +907,7 @@ function parsePhotoMetaMobile(v){
       }
       // Phone normalize for DB check: expect exactly 10 digits and store as +90XXXXXXXXXX
       if (payload.phone){
-        let d = String(payload.phone||'').replace(/\D/g,'');
+        let d = String(payload.phone|| '').replace(/\D/g,'');
         if (d.startsWith('90')) d = d.slice(2);
         if (d.startsWith('0')) d = d.slice(1);
         d = d.slice(0,10);
@@ -926,7 +926,7 @@ function parsePhotoMetaMobile(v){
             .replace(/[\s\u00A0\u200B-\u200D\uFEFF]/g, '')
             .toLowerCase();
           payload.email = cleaned || null;
-        }catch{ payload.email = String(payload.email||'').trim().toLowerCase() || null; }
+        }catch{ payload.email = String(payload.email|| '').trim().toLowerCase() || null; }
       }
       if (payload.email && !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(payload.email)) return alert('Geçerli bir e‑posta giriniz');
       if (payload.email === null) { delete payload.email; }
@@ -1039,7 +1039,7 @@ await loadAdminMembers();
   function openIdCardPreview(member){
     try{
       $modalTitle().textContent = 'Dijital Kimlik';
-      const form = $modalForm(); form.innerHTML='';
+      const form = $modalForm(); form.innerHTML= '';
       const wrap = document.createElement('div'); wrap.style.display='grid'; wrap.style.gap='12px';
       form.appendChild(wrap);
       const canvas = document.createElement('canvas'); canvas.width = 638; canvas.height = 1012; canvas.style.maxWidth='100%'; canvas.style.borderRadius='12px'; canvas.style.border='1px solid #e5e7eb'; wrap.appendChild(canvas);
@@ -1204,9 +1204,9 @@ await loadAdminMembers();
             // Draw the photo
             ctx.drawImage(ph, x, y, newWidth, newHeight);
           }
-          else { try{ const g = String(member.gender||'').toLowerCase(); const fb = /kadin|kadın|female/.test(g) ? 'kadin.jpeg' : 'erkek.jpeg'; const ph = await loadImg(fb); const baseScale = Math.max((photoR*2)/ph.width, (photoR*2)/ph.height); const scale = baseScale; const newWidth = ph.width*scale; const newHeight = ph.height*scale; const x = photoCX - newWidth/2; const y = photoCY - newHeight/2; ctx.drawImage(ph, x, y, newWidth, newHeight); }catch{
+          else { try{ const g = String(member.gender|| '').toLowerCase(); const fb = /kadin|kadın|female/.test(g) ? 'kadin.jpeg' : 'erkek.jpeg'; const ph = await loadImg(fb); const baseScale = Math.max((photoR*2)/ph.width, (photoR*2)/ph.height); const scale = baseScale; const newWidth = ph.width*scale; const newHeight = ph.height*scale; const x = photoCX - newWidth/2; const y = photoCY - newHeight/2; ctx.drawImage(ph, x, y, newWidth, newHeight); }catch{
   try{
-    const g = String(member.gender||'').toLowerCase();
+    const g = String(member.gender|| '').toLowerCase();
     const fb = /kadin|kadın|female/.test(g) ? 'kadin.jpeg' : 'erkek.jpeg';
     const ph = await loadImg(fb);
     const baseScale = Math.max((photoR*2)/ph.width, (photoR*2)/ph.height);
@@ -1222,7 +1222,7 @@ await loadAdminMembers();
 }}
         }catch{
   try{
-    const g = String(member.gender||'').toLowerCase();
+    const g = String(member.gender|| '').toLowerCase();
     const fb = /kadin|kadın|female/.test(g) ? 'kadin.jpeg' : 'erkek.jpeg';
     const ph = await loadImg(fb);
     const baseScale = Math.max((photoR*2)/ph.width, (photoR*2)/ph.height);
@@ -1258,12 +1258,12 @@ await loadAdminMembers();
           ctx.save(); roundRect(ctx, bannerX, bannerY, bannerW, bannerH, 10); ctx.clip();
           ctx.fillStyle=C_TEAL; ctx.fill(); ctx.restore();
           ctx.fillStyle = '#ffffff'; ctx.font = 'bold 28px Inter, Arial, sans-serif';
-          ctx.fillText(`${(member.first_name||'').toUpperCase()} ${(member.last_name||'').toUpperCase()}`.trim(), canvas.width/2, bannerY+34);
+          ctx.fillText(`${(member.first_name|| '').toUpperCase()} ${(member.last_name|| '').toUpperCase()}`.trim(), canvas.width/2, bannerY+34);
           if (member.title){ ctx.fillStyle = C_ORANGE; ctx.font='bold 22px Inter, Arial, sans-serif'; ctx.fillText(String(member.title).toUpperCase(), canvas.width/2, bannerY+58); }
         } else {
           // Shifted further down by ~24px from previous
           ctx.fillStyle = C_TEAL; ctx.font = 'bold 28px Inter, Arial, sans-serif';
-          ctx.fillText(`${(member.first_name||'').toUpperCase()} ${(member.last_name||'').toUpperCase()}`.trim(), canvas.width/2, photoCY+photoR+88);
+          ctx.fillText(`${(member.first_name|| '').toUpperCase()} ${(member.last_name|| '').toUpperCase()}`.trim(), canvas.width/2, photoCY+photoR+88);
           if (member.title){ ctx.fillStyle = C_ORANGE; ctx.font='bold 22px Inter, Arial, sans-serif'; ctx.fillText(String(member.title).toUpperCase(), canvas.width/2, photoCY+photoR+114); }
         }
         // Details and QR: if vector, draw white card; if template, print directly in template box
@@ -1328,15 +1328,15 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         try{ window.__idcardLastPng = canvas.toDataURL('image/jpeg', 0.92); }catch{}
       })();
       function roundRect(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.save(); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath(); }
-      function loadImg(src){ return new Promise((res,rej)=>{ const i=new Image(); try{ if (/^https?:/i.test(String(src||''))){ const u = new URL(src, location.href); if (u.origin !== location.origin){ i.crossOrigin='anonymous'; } } }catch{} i.onload=()=>res(i); i.onerror=()=>rej(new Error('img load failed')); i.src=src; }); }
-      function fileName(url){ try{ const u=new URL(url, location.origin); return u.pathname.split('/').pop()||'dosya'; }catch{ const parts=String(url||'').split('/'); return parts[parts.length-1]||'dosya'; } }
+      function loadImg(src){ return new Promise((res,rej)=>{ const i=new Image(); try{ if (/^https?:/i.test(String(src|| ''))){ const u = new URL(src, location.href); if (u.origin !== location.origin){ i.crossOrigin='anonymous'; } } }catch{} i.onload=()=>res(i); i.onerror=()=>rej(new Error('img load failed')); i.src=src; }); }
+      function fileName(url){ try{ const u=new URL(url, location.origin); return u.pathname.split('/').pop()||'dosya'; }catch{ const parts=String(url|| '').split('/'); return parts[parts.length-1]||'dosya'; } }
       function renderExistingDocs(){
-        docsPrev.innerHTML='';
+        docsPrev.innerHTML= '';
         let arr=[]; try{ arr = JSON.parse(row.documents_urls||'[]'); if(!Array.isArray(arr)) arr=[]; }catch{}
         arr.forEach(url=>{
           const card = document.createElement('div'); card.className='card'; card.style.padding='6px'; card.style.display='flex'; card.style.flexDirection='column'; card.style.gap='6px';
           if (isImg(url)){
-            const img = document.createElement('img'); img.alt=''; img.style.width='100%'; img.style.height='86px'; img.style.objectFit='cover'; img.style.borderRadius='8px';
+            const img = document.createElement('img'); img.alt= ''; img.style.width='100%'; img.style.height='86px'; img.style.objectFit='cover'; img.style.borderRadius='8px';
             img.src = bust(url);
             card.appendChild(img);
           } else {
@@ -1382,7 +1382,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
     const byKey = new Map(rows.map(r=>[String(r.key), r.value]));
 
     // Helpers
-    const norm = (s)=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+    const norm = (s)=>String(s|| '').toLowerCase().replace(/\s+/g,' ').trim();
     const labelToKey = new Map(Object.entries({
       'recaptcha site key':'recaptcha_site_key',
       'recaptcha secret key':'recaptcha_secret_key',
@@ -1436,7 +1436,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       row.innerHTML = `<span style="font-weight:600">${label}</span>`;
       const input = document.createElement(type==='select'?'select':'input');
       if (type==='select'){
-        const opt1=document.createElement('option'); opt1.value=''; opt1.textContent='Varsayılan';
+        const opt1=document.createElement('option'); opt1.value= ''; opt1.textContent='Varsayılan';
         const opt2=document.createElement('option'); opt2.value='vector'; opt2.textContent='Vector (Önerilir)';
         const opt3=document.createElement('option'); opt3.value='psd'; opt3.textContent='Arkaplan (PSD PNG)';
         input.appendChild(opt1); input.appendChild(opt2); input.appendChild(opt3);
@@ -1506,7 +1506,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
 
   // ========== PAGES ==========
   async function loadAdminPages(){
-    const tbody = qs('#pagesTableBody'); if (!tbody) return; tbody.innerHTML='';
+    const tbody = qs('#pagesTableBody'); if (!tbody) return; tbody.innerHTML= '';
     try{
       const table = tbody.closest('table');
       const headRow = table && table.tHead && table.tHead.rows && table.tHead.rows[0];
@@ -1530,10 +1530,10 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       (data||[]).forEach(row => {
         const tr = document.createElement('tr');
         const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı' };
-        const statusTr = statusMap[String(row.status||'').toLowerCase()] || (row.status||'');
+        const statusTr = statusMap[String(row.status|| '').toLowerCase()] || (row.status|| '');
         tr.innerHTML = `
-          <td>${escapeHtml(row.title||'')}</td>
-          <td>${escapeHtml(row.slug||'')}</td>
+          <td>${escapeHtml(row.title|| '')}</td>
+          <td>${escapeHtml(row.slug|| '')}</td>
           <td>${escapeHtml(statusTr)}</td>
           <td>${row.published_at ? new Date(row.published_at).toLocaleString('tr-TR') : '-'}</td>
           <td>${row.unpublish_at ? new Date(row.unpublish_at).toLocaleString('tr-TR') : '-'}</td>
@@ -1543,7 +1543,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         tbody.appendChild(tr);
       });
        // Wire: Yeni Sayfa
-    const addBtn = qs('#newPageBtn'); if (addBtn && !addBtn.dataset.wired){ addBtn.dataset.wired='1'; addBtn.onclick = ()=> openPageModal({ id:null, title:'', slug:'', status:'draft' }); }
+    const addBtn = qs('#newPageBtn'); if (addBtn && !addBtn.dataset.wired){ addBtn.dataset.wired='1'; addBtn.onclick = ()=> openPageModal({ id:null, title:', slug:', status:'draft' }); }
       wirePagesRowActions();
     }catch(e){ alert('Sayfalar yüklenemedi: ' + (e?.message||String(e))); }
   }
@@ -1571,18 +1571,18 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
     try{
       row = row || { id:null, title:'', slug:'', status:'draft', body:'', published_at:null, unpublish_at:null };
       $modalTitle().textContent = row.id ? 'Sayfayı Düzenle' : 'Yeni Sayfa';
-      const form = $modalForm(); form.innerHTML='';
+      const form = $modalForm(); form.innerHTML= '';
 
       // Title
-      const tLbl=document.createElement('label'); tLbl.style.display='grid'; tLbl.style.gap='6px'; tLbl.innerHTML='<span>Başlık</span>'; const tIn=document.createElement('input'); tIn.value=row.title||''; tLbl.appendChild(tIn); form.appendChild(tLbl);
+      const tLbl=document.createElement('label'); tLbl.style.display='grid'; tLbl.style.gap='6px'; tLbl.innerHTML='<span>Başlık</span>'; const tIn=document.createElement('input'); tIn.value=row.title|| ''; tLbl.appendChild(tIn); form.appendChild(tLbl);
 
       // Slug
-      const sLbl=document.createElement('label'); sLbl.style.display='grid'; sLbl.style.gap='6px'; sLbl.innerHTML='<span>Slug</span>'; const sIn=document.createElement('input'); sIn.value=row.slug||''; sLbl.appendChild(sIn); form.appendChild(sLbl);
+      const sLbl=document.createElement('label'); sLbl.style.display='grid'; sLbl.style.gap='6px'; sLbl.innerHTML='<span>Slug</span>'; const sIn=document.createElement('input'); sIn.value=row.slug|| ''; sLbl.appendChild(sIn); form.appendChild(sLbl);
 
       // Body editor: Word-like toolbar + contentEditable area
       const bLbl=document.createElement('label'); bLbl.style.display='grid'; bLbl.style.gap='6px'; bLbl.innerHTML='<span>İçerik</span>';
       const tb=document.createElement('div'); tb.style.display='flex'; tb.style.flexWrap='wrap'; tb.style.gap='6px'; tb.style.margin='6px 0';
-      const ed=document.createElement('div'); ed.contentEditable='true'; ed.className='card'; ed.style.minHeight='240px'; ed.style.padding='10px'; ed.style.overflow='auto'; ed.innerHTML = (row.body||'');
+      const ed=document.createElement('div'); ed.contentEditable='true'; ed.className='card'; ed.style.minHeight='240px'; ed.style.padding='10px'; ed.style.overflow='auto'; ed.innerHTML = (row.body|| '');
       function btn(label, title, on){ const b=document.createElement('button'); b.type='button'; b.className='btn btn-outline'; b.textContent=label; b.title=title; b.style.padding='6px 10px'; b.addEventListener('click', (e)=>{ e.preventDefault(); on(); ed.focus(); }); return b; }
       function applyInlineStyle(prop, val){
         const sel = window.getSelection(); if (!sel || !sel.rangeCount) return;
@@ -1596,7 +1596,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       }
       function applyBlock(cmd){ document.execCommand(cmd,false,null); }
       // Font family
-      const ff=document.createElement('select'); ff.className='btn btn-outline'; ['Default','Arial','Georgia','Tahoma','Times New Roman','Verdana','Courier New'].forEach(f=>{ const o=document.createElement('option'); o.value=f==='Default'?'':f; o.textContent=f; ff.appendChild(o); }); ff.addEventListener('change',()=>{ if(ff.value) applyInlineStyle('fontFamily', ff.value); });
+      const ff=document.createElement('select'); ff.className='btn btn-outline'; ['Default','Arial','Georgia','Tahoma','Times New Roman','Verdana','Courier New'].forEach(f=>{ const o=document.createElement('option'); o.value=(f==='Default')?'':f; o.textContent=f; ff.appendChild(o); }); ff.addEventListener('change',()=>{ if(ff.value) applyInlineStyle('fontFamily', ff.value); });
       // Font size (px)
       const fs=document.createElement('input'); fs.type='number'; fs.min='10'; fs.max='72'; fs.value='16'; fs.title='Yazı Boyutu (px)'; fs.className='btn btn-outline'; fs.style.width='84px';
       fs.addEventListener('change',()=> applyInlineStyle('fontSize', fs.value+'px'));
@@ -1633,8 +1633,8 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       stLbl.appendChild(stSel); form.appendChild(stLbl);
 
       // Dates
-      const pLbl=document.createElement('label'); pLbl.style.display='grid'; pLbl.style.gap='6px'; pLbl.innerHTML='<span>Yayın Tarihi</span>'; const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16):''; pLbl.appendChild(pIn); form.appendChild(pLbl);
-      const uLbl=document.createElement('label'); uLbl.style.display='grid'; uLbl.style.gap='6px'; uLbl.innerHTML='<span>Yayından Kaldırma</span>'; const uIn=document.createElement('input'); uIn.type='datetime-local'; uIn.value=row.unpublish_at? new Date(row.unpublish_at).toISOString().slice(0,16):''; uLbl.appendChild(uIn); form.appendChild(uLbl);
+      const pLbl=document.createElement('label'); pLbl.style.display='grid'; pLbl.style.gap='6px'; pLbl.innerHTML='<span>Yayın Tarihi</span>'; const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16): ''; pLbl.appendChild(pIn); form.appendChild(pLbl);
+      const uLbl=document.createElement('label'); uLbl.style.display='grid'; uLbl.style.gap='6px'; uLbl.innerHTML='<span>Yayından Kaldırma</span>'; const uIn=document.createElement('input'); uIn.type='datetime-local'; uIn.value=row.unpublish_at? new Date(row.unpublish_at).toISOString().slice(0,16): ''; uLbl.appendChild(uIn); form.appendChild(uLbl);
 
       // Actions
       const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
@@ -1648,9 +1648,9 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         try{
           const payload = {
             id: row.id || undefined,
-            title: String(tIn.value||'').trim(),
-            slug: String(sIn.value||'').trim(),
-            body: String(ed.innerHTML||'').trim(),
+            title: String(tIn.value|| '').trim(),
+            slug: String(sIn.value|| '').trim(),
+            body: String(ed.innerHTML|| '').trim(),
             status: String(stSel.value||'draft'),
             published_at: pIn.value ? new Date(pIn.value).toISOString() : null,
             unpublish_at: uIn.value ? new Date(uIn.value).toISOString() : null,
@@ -1676,7 +1676,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
   }
 
   function openEmailCompose(to, subjOrig, msgId, afterSend){
-    const subjDefault = /^\s*re:/i.test(subjOrig||'') ? (subjOrig||'') : `Re: ${subjOrig||'Yanıt'}`;
+    const subjDefault = /^\s*re:/i.test(subjOrig|| '') ? (subjOrig|| '') : `Re: ${subjOrig||'Yanıt'}`;
 
     $modalTitle().textContent = 'E‑posta Gönder';
     const form = $modalForm(); form.innerHTML = '';
@@ -1687,7 +1687,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
     const toLbl = document.createElement('label'); toLbl.style.display='grid'; toLbl.style.gap='6px'; toLbl.innerHTML = '<span>Alıcı</span>';
     const toIn = document.createElement('input');
     toIn.type='email';
-    toIn.value = String(to||'').replace(/^mailto:/i,'').trim(); // <-- önemli
+    toIn.value = String(to|| '').replace(/^mailto:/i,'').trim(); // <-- önemli
     toIn.disabled = true;
     toLbl.appendChild(toIn); wrap.appendChild(toLbl);
 
@@ -1712,9 +1712,9 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
     sendBtn.addEventListener('click', async (e)=>{
       e.preventDefault();
 
-      const cleanTo = String(to||'').replace(/^mailto:/i,'').trim();
-      const subject = String(sIn.value||'').trim();
-      const message = String(mIn.value||'').trim();
+      const cleanTo = String(to|| '').replace(/^mailto:/i,'').trim();
+      const subject = String(sIn.value|| '').trim();
+      const message = String(mIn.value|| '').trim();
 
       if (!cleanTo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanTo)){
         alert('Geçerli bir alıcı e‑posta bulunamadı.');
@@ -1779,7 +1779,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
  
   // ========== NEWS ==========
   async function loadAdminNews(){
-    const tbody = $newsTBody(); if (!tbody) return; tbody.innerHTML='';
+    const tbody = $newsTBody(); if (!tbody) return; tbody.innerHTML= '';
     // Hard-set THEAD to ensure correct column order
     try{
       const table = tbody.closest('table');
@@ -1805,16 +1805,16 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         const tr = document.createElement('tr');
         const thumb = row.image_url ? `<img src="${escapeHtml(bust(row.image_url))}" alt=" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;vertical-align:middle"/>` : '';
         const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı', active:'Yayımlandı' };
-        const statusTr = statusMap[String(row.status||'').toLowerCase()] || (row.status||'');
+        const statusTr = statusMap[String(row.status|| '').toLowerCase()] || (row.status|| '');
         tr.innerHTML = `
-          <td>${thumb}<span style="vertical-align:middle">${escapeHtml(row.title||'')}</span></td>
-          <td>${escapeHtml(row.summary||'')}</td>
+          <td>${thumb}<span style="vertical-align:middle">${escapeHtml(row.title|| '')}</span></td>
+          <td>${escapeHtml(row.summary|| '')}</td>
           <td>${escapeHtml(statusTr)}</td>
           <td>${row.published_at ? new Date(row.published_at).toLocaleString('tr-TR') : '-'}</td>
           <td>${row.unpublish_at ? new Date(row.unpublish_at).toLocaleString('tr-TR') : '-'}</td>
           <td class="actions">
             <button class="btn btn-warning" data-edit-news="${row.id}">Düzenle</button>
-            ${String(row.status||'').toLowerCase()==='published' ? `<button class="btn btn-danger" data-unpub-news="${row.id}">Yayından Kaldır</button>` : `<button class="btn btn-success" data-pub-news="${row.id}">Yayınla</button>`}
+            ${String(row.status|| '').toLowerCase()==='published' ? `<button class="btn btn-danger" data-unpub-news="${row.id}">Yayından Kaldır</button>` : `<button class="btn btn-success" data-pub-news="${row.id}">Yayınla</button>`}
           </td>`;
         tbody.appendChild(tr);
       });
@@ -1825,7 +1825,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
 
   // ========== ANNOUNCEMENTS ==========
   async function loadAdminAnnouncements(){
-    const tbody = $annTBody(); if (!tbody) return; tbody.innerHTML='';
+    const tbody = $annTBody(); if (!tbody) return; tbody.innerHTML= '';
     // Hard-set THEAD to ensure correct column order
     try{
       const table = tbody.closest('table');
@@ -1851,16 +1851,16 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         const tr = document.createElement('tr');
         const thumb = row.image_url ? `<img src="${escapeHtml(bust(row.image_url))}" alt=" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;vertical-align:middle"/>` : '';
         const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı', active:'Yayımlandı' };
-        const statusTr = statusMap[String(row.status||'').toLowerCase()] || (row.status||'');
+        const statusTr = statusMap[String(row.status|| '').toLowerCase()] || (row.status|| '');
         tr.innerHTML = `
-          <td>${thumb}<span style="vertical-align:middle">${escapeHtml(row.title||'')}</span></td>
-          <td>${escapeHtml(row.body||'')}</td>
+          <td>${thumb}<span style="vertical-align:middle">${escapeHtml(row.title|| '')}</span></td>
+          <td>${escapeHtml(row.body|| '')}</td>
           <td>${escapeHtml(statusTr)}</td>
           <td>${row.published_at ? new Date(row.published_at).toLocaleString('tr-TR') : '-'}</td>
           <td>${row.unpublish_at ? new Date(row.unpublish_at).toLocaleString('tr-TR') : '-'}</td>
           <td class="actions">
             <button class="btn btn-warning" data-edit-ann="${row.id}">Düzenle</button>
-            ${String(row.status||'').toLowerCase()==='published' ? `<button class="btn btn-danger" data-unpub-ann="${row.id}">Yayından Kaldır</button>` : `<button class="btn btn-success" data-pub-ann="${row.id}">Yayınla</button>`}
+            ${String(row.status|| '').toLowerCase()==='published' ? `<button class="btn btn-danger" data-unpub-ann="${row.id}">Yayından Kaldır</button>` : `<button class="btn btn-success" data-pub-ann="${row.id}">Yayınla</button>`}
           </td>`;
         tbody.appendChild(tr);
       });
@@ -2014,7 +2014,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         const replySubj = (fullRow && (fullRow.reply_subject ?? fullRow.replySubject)) || '';
         const repliedAt = (fullRow && (fullRow.replied_at ?? fullRow.repliedAt)) || null;
         const repliedBy = (fullRow && (fullRow.replied_by ?? fullRow.repliedBy)) || '';
-        if (String(replyBody||'').trim() || String(replySubj||'').trim() || repliedAt || String(repliedBy||'').trim()){
+        if (String(replyBody|| '').trim() || String(replySubj|| '').trim() || repliedAt || String(repliedBy|| '').trim()){
           wrap.appendChild(roInput('Yanıtlayan', repliedBy || '-', 'text'));
           wrap.appendChild(roInput('Yanıt Tarihi', repliedAt ? new Date(repliedAt).toLocaleString('tr-TR') : '-', 'text'));
           wrap.appendChild(roInput('Yanıt Konusu', replySubj || '-', 'text'));
@@ -2116,16 +2116,16 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
     try{
       row = row || { id:null, title:'', summary:'', image_url:'', status:'draft', published_at:null, unpublish_at:null };
       $modalTitle().textContent = row.id ? 'Haberi Düzenle' : 'Yeni Haber';
-      const form = $modalForm(); form.innerHTML='';
+      const form = $modalForm(); form.innerHTML= '';
 
       // Title
-      const tLbl=document.createElement('label'); tLbl.style.display='grid'; tLbl.style.gap='6px'; tLbl.innerHTML='<span>Başlık</span>'; const tIn=document.createElement('input'); tIn.value=row.title||''; tLbl.appendChild(tIn); form.appendChild(tLbl);
+      const tLbl=document.createElement('label'); tLbl.style.display='grid'; tLbl.style.gap='6px'; tLbl.innerHTML='<span>Başlık</span>'; const tIn=document.createElement('input'); tIn.value=row.title|| ''; tLbl.appendChild(tIn); form.appendChild(tLbl);
       // Summary
-      const sLbl=document.createElement('label'); sLbl.style.display='grid'; sLbl.style.gap='6px'; sLbl.innerHTML='<span>Özet</span>'; const sIn=document.createElement('textarea'); sIn.rows=3; sIn.value=row.summary||''; sLbl.appendChild(sIn); form.appendChild(sLbl);
+      const sLbl=document.createElement('label'); sLbl.style.display='grid'; sLbl.style.gap='6px'; sLbl.innerHTML='<span>Özet</span>'; const sIn=document.createElement('textarea'); sIn.rows=3; sIn.value=row.summary|| ''; sLbl.appendChild(sIn); form.appendChild(sLbl);
       // Body editor: Word-like toolbar + contentEditable area
       const bLbl=document.createElement('label'); bLbl.style.display='grid'; bLbl.style.gap='6px'; bLbl.innerHTML='<span>İçerik</span>';
       const tb=document.createElement('div'); tb.style.display='flex'; tb.style.flexWrap='wrap'; tb.style.gap='6px'; tb.style.margin='6px 0';
-      const ed=document.createElement('div'); ed.contentEditable='true'; ed.className='card'; ed.style.minHeight='240px'; ed.style.padding='10px'; ed.style.overflow='auto'; ed.innerHTML = (row.body||'');
+      const ed=document.createElement('div'); ed.contentEditable='true'; ed.className='card'; ed.style.minHeight='240px'; ed.style.padding='10px'; ed.style.overflow='auto'; ed.innerHTML = (row.body|| '');
       function btn(label, title, on){ const b=document.createElement('button'); b.type='button'; b.className='btn btn-outline'; b.textContent=label; b.title=title; b.style.padding='6px 10px'; b.addEventListener('click', (e)=>{ e.preventDefault(); on(); ed.focus(); }); return b; }
       function applyInlineStyle(prop, val){
         const sel = window.getSelection(); if (!sel || !sel.rangeCount) return;
@@ -2139,7 +2139,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       }
       function applyBlock(cmd){ document.execCommand(cmd,false,null); }
       // Font family
-      const ff=document.createElement('select'); ff.className='btn btn-outline'; ['Default','Arial','Georgia','Tahoma','Times New Roman','Verdana','Courier New'].forEach(f=>{ const o=document.createElement('option'); o.value=f==='Default'?'':f; o.textContent=f; ff.appendChild(o); }); ff.addEventListener('change',()=>{ if(ff.value) applyInlineStyle('fontFamily', ff.value); });
+      const ff=document.createElement('select'); ff.className='btn btn-outline'; ['Default','Arial','Georgia','Tahoma','Times New Roman','Verdana','Courier New'].forEach(f=>{ const o=document.createElement('option'); o.value=(f==='Default')?'':f; o.textContent=f; ff.appendChild(o); }); ff.addEventListener('change',()=>{ if(ff.value) applyInlineStyle('fontFamily', ff.value); });
       // Font size (px)
       const fs=document.createElement('input'); fs.type='number'; fs.min='10'; fs.max='72'; fs.value='16'; fs.title='Yazı Boyutu (px)'; fs.className='btn btn-outline'; fs.style.width='84px'; fs.addEventListener('change',()=> applyInlineStyle('fontSize', fs.value+'px'));
       // Line height
@@ -2177,16 +2177,16 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       tb.appendChild(fontSizeInput);
       // Image
       const iLbl=document.createElement('label'); iLbl.style.display='grid'; iLbl.style.gap='6px'; iLbl.innerHTML='<span>Kapak Görseli</span>';
-      const iIn=document.createElement('input'); iIn.placeholder='https://... (opsiyonel)'; iIn.value=row.image_url||'';
+      const iIn=document.createElement('input'); iIn.placeholder='https://... (opsiyonel)'; iIn.value=row.image_url|| '';
       const iFile=document.createElement('input'); iFile.type='file'; iFile.accept='image/*';
       const iWrap=document.createElement('div'); iWrap.style.display='grid'; iWrap.style.gap='6px'; iWrap.appendChild(iIn); iWrap.appendChild(iFile); iLbl.appendChild(iWrap); form.appendChild(iLbl);
       // Cover crop controls (for slider)
       const coverLbl = document.createElement('div'); coverLbl.className='card'; coverLbl.style.padding='10px'; coverLbl.style.display='grid'; coverLbl.style.gap='8px'; coverLbl.style.margin='8px 0';
       const coverTitle = document.createElement('div'); coverTitle.textContent = 'Kapak (Slider) Kadrajı'; coverTitle.style.fontWeight='600'; coverLbl.appendChild(coverTitle);
-      const initCover = parsePhotoMeta(row.cover_image_url||'');
+      const initCover = parsePhotoMeta(row.cover_image_url|| '');
           const cZoom = document.createElement('input'); cZoom.type='hidden'; cZoom.value = String(Math.max(1, initCover.z || 1).toFixed(2)); cZoom.setAttribute('data-cover-zoom','1');
     const cOy = document.createElement('input'); cOy.type='hidden'; cOy.value = String(initCover.oy || 0); cOy.setAttribute('data-cover-oy','1');
-    const cOx = document.createElement('input'); cOx.type='hidden'; cOx.value = String(initCover.ox || 0); cOx.setAttribute('data-cover-ox','1');      const initCoverM = parsePhotoMetaMobile(row.cover_image_url||'');
+    const cOx = document.createElement('input'); cOx.type='hidden'; cOx.value = String(initCover.ox || 0); cOx.setAttribute('data-cover-ox','1');      const initCoverM = parsePhotoMetaMobile(row.cover_image_url|| '');
       const mZoom = document.createElement('input'); mZoom.type='hidden'; mZoom.value = String(Math.max(1, initCoverM.zm || 1).toFixed(2)); mZoom.setAttribute('data-m-zoom','1');
       const mOy = document.createElement('input'); mOy.type='hidden'; mOy.value = String(initCoverM.oym || 0); mOy.setAttribute('data-m-oy','1');
       const mOx = document.createElement('input'); mOx.type='hidden'; mOx.value = String(initCoverM.oxm || 0); mOx.setAttribute('data-m-ox','1');
@@ -2228,7 +2228,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
 
       function currentCoverBase(){
         if (iFile.files && iFile.files[0]){ try{ return URL.createObjectURL(iFile.files[0]); }catch{} }
-        return (String(iIn.value||'').trim() || stripPhotoKey(row.cover_image_url||row.image_url||''));
+        return (String(iIn.value|| '').trim() || stripPhotoKey(row.cover_image_url||row.image_url|| ''));
       }
       function updateCoverPreview(){
   const base = currentCoverBase();
@@ -2369,8 +2369,8 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       statusOptsNews.forEach(({v,t})=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; if (v===(row.status||'draft')) o.selected=true; stSel.appendChild(o); });
       stLbl.appendChild(stSel); form.appendChild(stLbl);
       // Dates
-      const pLbl=document.createElement('label'); pLbl.style.display='grid'; pLbl.style.gap='6px'; pLbl.innerHTML='<span>Yayın Tarihi</span>'; const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16):''; pLbl.appendChild(pIn); form.appendChild(pLbl);
-      const uLbl=document.createElement('label'); uLbl.style.display='grid'; uLbl.style.gap='6px'; uLbl.innerHTML='<span>Yayından Kaldırma</span>'; const uIn=document.createElement('input'); uIn.type='datetime-local'; uIn.value=row.unpublish_at? new Date(row.unpublish_at).toISOString().slice(0,16):''; uLbl.appendChild(uIn); form.appendChild(uLbl);
+      const pLbl=document.createElement('label'); pLbl.style.display='grid'; pLbl.style.gap='6px'; pLbl.innerHTML='<span>Yayın Tarihi</span>'; const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16): ''; pLbl.appendChild(pIn); form.appendChild(pLbl);
+      const uLbl=document.createElement('label'); uLbl.style.display='grid'; uLbl.style.gap='6px'; uLbl.innerHTML='<span>Yayından Kaldırma</span>'; const uIn=document.createElement('input'); uIn.type='datetime-local'; uIn.value=row.unpublish_at? new Date(row.unpublish_at).toISOString().slice(0,16): ''; uLbl.appendChild(uIn); form.appendChild(uLbl);
       // Gallery
       const gLbl=document.createElement('label'); gLbl.style.display='grid'; gLbl.style.gap='6px'; gLbl.innerHTML='<span>Galeri URL’leri (JSON dizi, eski görseli silmek için URL’yi çıkarın)</span>';
       const gIn=document.createElement('textarea'); gIn.rows=3;
@@ -2389,10 +2389,10 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         try{
           const payload = {
             id: row.id || undefined,
-            title: String(tIn.value||'').trim(),
-            summary: String(sIn.value||'').trim(),
-            body: String(ed.innerHTML||'').trim(),
-            image_url: String(iIn.value||'').trim() || null,
+            title: String(tIn.value|| '').trim(),
+            summary: String(sIn.value|| '').trim(),
+            body: String(ed.innerHTML|| '').trim(),
+            image_url: String(iIn.value|| '').trim() || null,
             cover_image_url: null,
             status: String(stSel.value||'draft'),
             published_at: pIn.value ? new Date(pIn.value).toISOString() : null,
@@ -2434,7 +2434,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
 }catch{}
           // If no new file, still save crop meta referencing existing image_url (or keep previous cover if none)
           if (!payload.image_url){
-            const base = String(payload.image_url||'').trim() || stripPhotoKey(row.cover_image_url||row.image_url||'');
+            const base = String(payload.image_url|| '').trim() || stripPhotoKey(row.cover_image_url||row.image_url|| '');
             if (base){ payload.cover_image_url = buildPhotoValue(base, Object.assign({}, coverMeta, coverMetaM)); }
           } else {
             // Also set cover from uploaded
@@ -2458,12 +2458,12 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
     try{
       row = row || { id:null, title:'', body:'', image_url:'', status:'draft', published_at:null, unpublish_at:null };
       $modalTitle().textContent = row.id ? 'Duyuruyu Düzenle' : 'Yeni Duyuru';
-      const form = $modalForm(); form.innerHTML='';
+      const form = $modalForm(); form.innerHTML= '';
 
       // Title
-      const tLbl=document.createElement('label'); tLbl.style.display='grid'; tLbl.style.gap='6px'; tLbl.innerHTML='<span>Başlık</span>'; const tIn=document.createElement('input'); tIn.value=row.title||''; tLbl.appendChild(tIn); form.appendChild(tLbl);
+      const tLbl=document.createElement('label'); tLbl.style.display='grid'; tLbl.style.gap='6px'; tLbl.innerHTML='<span>Başlık</span>'; const tIn=document.createElement('input'); tIn.value=row.title|| ''; tLbl.appendChild(tIn); form.appendChild(tLbl);
       // Body
-      const bLbl=document.createElement('label'); bLbl.style.display='grid'; bLbl.style.gap='6px'; bLbl.innerHTML='<span>İçerik</span>'; const bIn=document.createElement('textarea'); bIn.rows=6; bIn.value=row.body||''; bIn.style.fontFamily='ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+      const bLbl=document.createElement('label'); bLbl.style.display='grid'; bLbl.style.gap='6px'; bLbl.innerHTML='<span>İçerik</span>'; const bIn=document.createElement('textarea'); bIn.rows=6; bIn.value=row.body|| ''; bIn.style.fontFamily='ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
       const tb=document.createElement('div'); tb.style.display='flex'; tb.style.gap='6px'; tb.style.flexWrap='wrap'; tb.style.margin='6px 0';
       function mkBtn(txt, title, fn){ const btn=document.createElement('button'); btn.type='button'; btn.className='btn btn-outline'; btn.textContent=txt; btn.title=title; btn.style.padding='6px 10px'; btn.addEventListener('click', fn); return btn; }
       function selWrap(before, after=''){ const s=bIn.selectionStart||0, e=bIn.selectionEnd||0; const v=bIn.value; const picked=v.slice(s,e); const rep=before+picked+(after||before); bIn.setRangeText(rep, s, e, 'end'); bIn.focus(); renderPrev(); }
@@ -2484,14 +2484,14 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       tb.appendChild(mkBtn('•','Liste', ()=> selLinePrefix('- ')));
       tb.appendChild(mkBtn('🔗','Bağlantı', ()=>{ const s=bIn.selectionStart||0,e=bIn.selectionEnd||0; const picked=bIn.value.slice(s,e)||'metin'; const url=prompt('Bağlantı URL','https://'); if(!url) return; const rep=`[${picked}](${url})`; bIn.setRangeText(rep, s, e, 'end'); bIn.focus(); renderPrev(); }));
       const prev=document.createElement('div'); prev.className='card'; prev.style.padding='10px'; prev.style.maxHeight='220px'; prev.style.overflow='auto'; prev.style.marginTop='6px';
-      function mdToHtml(md){ let html='\n'+String(md||'')+'\n'; html=html.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); html=html.replace(/^######\s+(.*)$/gm,'<h6>$1</h6>').replace(/^#####\s+(.*)$/gm,'<h5>$1</h5>').replace(/^####\s+(.*)$/gm,'<h4>$1</h4>').replace(/^###\s+(.*)$/gm,'<h3>$1</h3>').replace(/^##\s+(.*)$/gm,'<h2>$1</h2>').replace(/^#\s+(.*)$/gm,'<h1>$1</h1>'); html=html.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`([^`]+)`/g,'<code>$1</code>'); html=html.replace(/\[([^\]]+)\]\((https?:[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1<\/a>'); html=html.replace(/^(?:\s*[-\*]\s+.+\n)+/gm,(block)=>{ const items=block.trim().split(/\n/).map(l=> l.replace(/^\s*[-\*]\s+/,'')).map(t=>`<li>${t}<\/li>`).join(''); return `<ul>${items}<\/ul>`; }); html=html.replace(/^(?!<h\d|<ul|<li|<p|<code|<blockquote|<img|<a)(.+)$/gm,'<p>$1<\/p>'); return html; }
+      function mdToHtml(md){ let html='\n'+String(md|| '')+'\n'; html=html.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); html=html.replace(/^######\s+(.*)$/gm,'<h6>$1</h6>').replace(/^#####\s+(.*)$/gm,'<h5>$1</h5>').replace(/^####\s+(.*)$/gm,'<h4>$1</h4>').replace(/^###\s+(.*)$/gm,'<h3>$1</h3>').replace(/^##\s+(.*)$/gm,'<h2>$1</h2>').replace(/^#\s+(.*)$/gm,'<h1>$1</h1>'); html=html.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`([^`]+)`/g,'<code>$1</code>'); html=html.replace(/\[([^\]]+)\]\((https?:[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1<\/a>'); html=html.replace(/^(?:\s*[-\*]\s+.+\n)+/gm,(block)=>{ const items=block.trim().split(/\n/).map(l=> l.replace(/^\s*[-\*]\s+/,'')).map(t=>`<li>${t}<\/li>`).join(''); return `<ul>${items}<\/ul>`; }); html=html.replace(/^(?!<h\d|<ul|<li|<p|<code|<blockquote|<img|<a)(.+)$/gm,'<p>$1<\/p>'); return html; }
       function renderPrev(){ prev.innerHTML = mdToHtml(bIn.value); }
       renderPrev(); bIn.addEventListener('input', renderPrev);
       bLbl.appendChild(tb); bLbl.appendChild(bIn); bLbl.appendChild(prev); form.appendChild(bLbl);
 
       // Image
       const iLbl=document.createElement('label'); iLbl.style.display='grid'; iLbl.style.gap='6px'; iLbl.innerHTML='<span>Kapak Görseli</span>';
-      const iIn=document.createElement('input'); iIn.placeholder='https://...'; iIn.value=row.image_url||'';
+      const iIn=document.createElement('input'); iIn.placeholder='https://...'; iIn.value=row.image_url|| '';
       const iFile=document.createElement('input'); iFile.type='file'; iFile.accept='image/*';
       const iWrap=document.createElement('div'); iWrap.style.display='grid'; iWrap.style.gap='6px'; iWrap.appendChild(iIn); iWrap.appendChild(iFile); iLbl.appendChild(iWrap); form.appendChild(iLbl);
       // Status
@@ -2506,8 +2506,8 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       statusOptsAnn.forEach(({v,t})=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; if (v===(row.status||'draft')) o.selected=true; stSel.appendChild(o); });
       stLbl.appendChild(stSel); form.appendChild(stLbl);
       // Dates
-      const pLbl=document.createElement('label'); pLbl.style.display='grid'; pLbl.style.gap='6px'; pLbl.innerHTML='<span>Yayın Tarihi</span>'; const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16):''; pLbl.appendChild(pIn); form.appendChild(pLbl);
-      const uLbl=document.createElement('label'); uLbl.style.display='grid'; uLbl.style.gap='6px'; uLbl.innerHTML='<span>Yayından Kaldırma</span>'; const uIn=document.createElement('input'); uIn.type='datetime-local'; uIn.value=row.unpublish_at? new Date(row.unpublish_at).toISOString().slice(0,16):''; uLbl.appendChild(uIn); form.appendChild(uLbl);
+      const pLbl=document.createElement('label'); pLbl.style.display='grid'; pLbl.style.gap='6px'; pLbl.innerHTML='<span>Yayın Tarihi</span>'; const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16): ''; pLbl.appendChild(pIn); form.appendChild(pLbl);
+      const uLbl=document.createElement('label'); uLbl.style.display='grid'; uLbl.style.gap='6px'; uLbl.innerHTML='<span>Yayından Kaldırma</span>'; const uIn=document.createElement('input'); uIn.type='datetime-local'; uIn.value=row.unpublish_at? new Date(row.unpublish_at).toISOString().slice(0,16): ''; uLbl.appendChild(uIn); form.appendChild(uLbl);
       // Actions
       const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
       const saveBtn=document.createElement('button'); saveBtn.className='btn btn-success'; saveBtn.textContent='Kaydet';
@@ -2520,9 +2520,9 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         try{
           const payload = {
             id: row.id || undefined,
-            title: String(tIn.value||'').trim(),
-            body: String(bIn.value||'').trim(),
-            image_url: String(iIn.value||'').trim() || null,
+            title: String(tIn.value|| '').trim(),
+            body: String(bIn.value|| '').trim(),
+            image_url: String(iIn.value|| '').trim() || null,
             status: String(stSel.value||'draft'),
             published_at: pIn.value ? new Date(pIn.value).toISOString() : null,
             unpublish_at: uIn.value ? new Date(uIn.value).toISOString() : null,
@@ -2580,7 +2580,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
   }
 // ========== AFİŞLER (POSTERS) ==========
 async function loadAdminPosters(){
-  const tbody = document.querySelector('#postersTableBody'); if (!tbody) return; tbody.innerHTML='';
+  const tbody = document.querySelector('#postersTableBody'); if (!tbody) return; tbody.innerHTML= '';
   try{
     const table = tbody.closest('table');
     const headRow = table && table.tHead && table.tHead.rows && table.tHead.rows[0];
@@ -2596,14 +2596,14 @@ async function loadAdminPosters(){
     (data||[]).forEach(row => {
       const tr=document.createElement('tr');
       const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı' };
-      const statusTr = statusMap[String(row.status||'').toLowerCase()] || (row.status||'');
+      const statusTr = statusMap[String(row.status|| '').toLowerCase()] || (row.status|| '');
       tr.innerHTML = `
-        <td>${escapeHtml(row.title||'')}</td>
+        <td>${escapeHtml(row.title|| '')}</td>
         <td>${escapeHtml(statusTr)}</td>
         <td>${row.published_at ? new Date(row.published_at).toLocaleString('tr-TR') : '-'}</td>
         <td class="actions">
           <button class="btn btn-warning" data-edit-poster="${row.id}">Düzenle</button>
-          ${String(row.status||'').toLowerCase()==='published'
+          ${String(row.status|| '').toLowerCase()==='published'
             ? `<button class="btn btn-danger" data-unpub-poster="${row.id}">Yayından Kaldır</button>` 
             : `<button class="btn btn-success" data-pub-poster="${row.id}">Yayınla</button>` 
           }
@@ -2653,16 +2653,16 @@ function openPosterModal(row){
   try{
     row = row || { id:null, title:'', body:'', image_url:'', status:'draft', published_at:null };
     $modalTitle().textContent = row.id ? 'Afişi Düzenle' : 'Yeni Afiş';
-    const form = $modalForm(); form.innerHTML='';
+    const form = $modalForm(); form.innerHTML= '';
 
     // Başlık
     const tLbl=document.createElement('label'); tLbl.style.display='grid'; tLbl.style.gap='6px'; tLbl.innerHTML='<span>Başlık</span>';
-    const tIn=document.createElement('input'); tIn.value=row.title||''; tLbl.appendChild(tIn); form.appendChild(tLbl);
+    const tIn=document.createElement('input'); tIn.value=row.title|| ''; tLbl.appendChild(tIn); form.appendChild(tLbl);
 
     // İçerik (Word benzeri editör)
     const bLbl=document.createElement('label'); bLbl.style.display='grid'; bLbl.style.gap='6px'; bLbl.innerHTML='<span>İçerik</span>';
     const tb=document.createElement('div'); tb.style.display='flex'; tb.style.flexWrap='wrap'; tb.style.gap='6px'; tb.style.margin='6px 0';
-    const ed=document.createElement('div'); ed.contentEditable='true'; ed.className='card'; ed.style.minHeight='160px'; ed.style.padding='10px'; ed.style.overflow='auto'; ed.innerHTML = (row.body||'');
+    const ed=document.createElement('div'); ed.contentEditable='true'; ed.className='card'; ed.style.minHeight='160px'; ed.style.padding='10px'; ed.style.overflow='auto'; ed.innerHTML = (row.body|| '');
     function btn(label, title, on){ const b=document.createElement('button'); b.type='button'; b.className='btn btn-outline'; b.textContent=label; b.title=title; b.style.padding='6px 10px'; b.addEventListener('click', (e)=>{ e.preventDefault(); on(); ed.focus(); }); return b; }
     function applyInlineStyle(prop, val){
       const sel = window.getSelection(); if (!sel || !sel.rangeCount) return;
@@ -2675,7 +2675,7 @@ function openPosterModal(row){
       }
     }
     function applyBlock(cmd){ document.execCommand(cmd,false,null); }
-    const ff=document.createElement('select'); ff.className='btn btn-outline'; ['Default','Arial','Georgia','Tahoma','Times New Roman','Verdana','Courier New'].forEach(f=>{ const o=document.createElement('option'); o.value=f==='Default'?'':f; o.textContent=f; ff.appendChild(o); }); ff.addEventListener('change',()=>{ if(ff.value) applyInlineStyle('fontFamily', ff.value); });
+    const ff=document.createElement('select'); ff.className='btn btn-outline'; ['Default','Arial','Georgia','Tahoma','Times New Roman','Verdana','Courier New'].forEach(f=>{ const o=document.createElement('option'); o.value=(f==='Default')?'':f; o.textContent=f; ff.appendChild(o); }); ff.addEventListener('change',()=>{ if(ff.value) applyInlineStyle('fontFamily', ff.value); });
     const fs=document.createElement('input'); fs.type='number'; fs.min='10'; fs.max='72'; fs.value='16'; fs.title='Yazı Boyutu (px)'; fs.className='btn btn-outline'; fs.style.width='84px'; fs.addEventListener('change',()=> applyInlineStyle('fontSize', fs.value+'px'));
     const lh=document.createElement('select'); lh.className='btn btn-outline'; ['1.0','1.2','1.4','1.6','1.8','2.0'].forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent='Satır: '+v; lh.appendChild(o); }); lh.addEventListener('change',()=> applyInlineStyle('lineHeight', lh.value));
     const col=document.createElement('input'); col.type='color'; col.className='btn btn-outline'; col.title='Yazı Rengi'; col.addEventListener('input',()=> applyInlineStyle('color', col.value));
@@ -2693,7 +2693,7 @@ function openPosterModal(row){
 
     // Görsel
     const iLbl=document.createElement('label'); iLbl.style.display='grid'; iLbl.style.gap='6px'; iLbl.innerHTML='<span>Görsel</span>';
-    const iIn=document.createElement('input'); iIn.placeholder='https://...'; iIn.value=row.image_url||'';
+    const iIn=document.createElement('input'); iIn.placeholder='https://...'; iIn.value=row.image_url|| '';
     const iFile=document.createElement('input'); iFile.type='file'; iFile.accept='image/*';
     const iWrap=document.createElement('div'); iWrap.style.display='grid'; iWrap.style.gap='6px'; iWrap.appendChild(iIn); iWrap.appendChild(iFile); iLbl.appendChild(iWrap); form.appendChild(iLbl);
 
@@ -2708,7 +2708,7 @@ function openPosterModal(row){
     statusOptsPoster.forEach(({v,t})=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; if ((row.status||'draft')===v) o.selected=true; stSel.appendChild(o); });
     stLbl.appendChild(stSel); form.appendChild(stLbl);
     const pLbl=document.createElement('label'); pLbl.style.display='grid'; pLbl.style.gap='6px'; pLbl.innerHTML='<span>Yayın Tarihi</span>';
-    const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16):''; pLbl.appendChild(pIn); form.appendChild(pLbl);
+    const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16): ''; pLbl.appendChild(pIn); form.appendChild(pLbl);
 
     // Actions
     const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
@@ -2722,9 +2722,9 @@ function openPosterModal(row){
       try{
         const payload = {
           id: row.id || undefined,
-          title: String(tIn.value||'').trim(),
-          body: String(ed.innerHTML||'').trim(),
-          image_url: String(iIn.value||'').trim() || null,
+          title: String(tIn.value|| '').trim(),
+          body: String(ed.innerHTML|| '').trim(),
+          image_url: String(iIn.value|| '').trim() || null,
           status: String(stSel.value||'draft'),
           published_at: pIn.value ? new Date(pIn.value).toISOString() : null,
         };
@@ -2749,7 +2749,7 @@ function openPosterModal(row){
 }
 // ========== RAPORLAR (REPORTS) ==========
 async function loadAdminReports(){
-  const tbody = document.querySelector('#reportsTableBody'); if (!tbody) return; tbody.innerHTML='';
+  const tbody = document.querySelector('#reportsTableBody'); if (!tbody) return; tbody.innerHTML= '';
   try{
     const table = tbody.closest('table');
     const headRow = table && table.tHead && table.tHead.rows && table.tHead.rows[0];
@@ -2765,14 +2765,14 @@ async function loadAdminReports(){
     (data||[]).forEach(row => {
       const tr=document.createElement('tr');
       const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı' };
-      const statusTr = statusMap[String(row.status||'').toLowerCase()] || (row.status||'');
+      const statusTr = statusMap[String(row.status|| '').toLowerCase()] || (row.status|| '');
       tr.innerHTML = `
-        <td>${escapeHtml(row.title||'')}</td>
+        <td>${escapeHtml(row.title|| '')}</td>
         <td>${escapeHtml(statusTr)}</td>
         <td>${row.published_at ? new Date(row.published_at).toLocaleString('tr-TR') : '-'}</td>
         <td class="actions">
           <button class="btn btn-warning" data-edit-report="${row.id}">Düzenle</button>
-          ${String(row.status||'').toLowerCase()==='published'
+          ${String(row.status|| '').toLowerCase()==='published'
             ? `<button class="btn btn-danger" data-unpub-report="${row.id}">Yayından Kaldır</button>` 
             : `<button class="btn btn-success" data-pub-report="${row.id}">Yayınla</button>` 
           }
@@ -2782,7 +2782,7 @@ async function loadAdminReports(){
     const addBtn = document.querySelector('#newReportBtn');
     if (addBtn && !addBtn.dataset.wired){
       addBtn.dataset.wired='1';
-      addBtn.onclick = ()=> openReportModal({ id:null, title:'', file_url:'', status:'draft', published_at:null });
+      addBtn.onclick = ()=> openReportModal({ id:null, title:', file_url:', status:'draft', published_at:null });
     }
     wireReportsRowActions();
   }catch(e){ alert('Raporlar yüklenemedi: ' + (e?.message || String(e))); }
@@ -2797,7 +2797,7 @@ function wireReportsRowActions(){
         const id = btn.getAttribute('data-edit-report');
         try{
           const { data } = await sb().from('reports').select('*').eq('id', id).maybeSingle();
-          openReportModal(data||{ id, title:'', file_url:'', status:'draft', published_at:null });
+          openReportModal(data||{ id, title:', file_url:', status:'draft', published_at:null });
         }catch(err){ alert('Rapor yüklenemedi: ' + (err?.message||String(err))); }
       });
     });
@@ -2822,15 +2822,15 @@ function openReportModal(row){
   try{
     row = row || { id:null, title:'', file_url:'', status:'draft', published_at:null };
     $modalTitle().textContent = row.id ? 'Raporu Düzenle' : 'Yeni Rapor';
-    const form = $modalForm(); form.innerHTML='';
+    const form = $modalForm(); form.innerHTML= '';
 
     // Başlık
     const tLbl=document.createElement('label'); tLbl.style.display='grid'; tLbl.style.gap='6px'; tLbl.innerHTML='<span>Başlık</span>';
-    const tIn=document.createElement('input'); tIn.value=row.title||''; tLbl.appendChild(tIn); form.appendChild(tLbl);
+    const tIn=document.createElement('input'); tIn.value=row.title|| ''; tLbl.appendChild(tIn); form.appendChild(tLbl);
 
     // Dosya
     const fLbl=document.createElement('label'); fLbl.style.display='grid'; fLbl.style.gap='6px'; fLbl.innerHTML='<span>Dosya (PDF/Word)</span>';
-    const fIn=document.createElement('input'); fIn.placeholder='https://...'; fIn.value=row.file_url||'';
+    const fIn=document.createElement('input'); fIn.placeholder='https://...'; fIn.value=row.file_url|| '';
     const fFile=document.createElement('input'); fFile.type='file'; fFile.accept='.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     const fWrap=document.createElement('div'); fWrap.style.display='grid'; fWrap.style.gap='6px'; fWrap.appendChild(fIn); fWrap.appendChild(fFile); fLbl.appendChild(fWrap); form.appendChild(fLbl);
 
@@ -2845,7 +2845,7 @@ function openReportModal(row){
     statusOptsReport.forEach(({v,t})=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; if ((row.status||'draft')===v) o.selected=true; stSel.appendChild(o); });
     stLbl.appendChild(stSel); form.appendChild(stLbl);
     const pLbl=document.createElement('label'); pLbl.style.display='grid'; pLbl.style.gap='6px'; pLbl.innerHTML='<span>Yayın Tarihi</span>';
-    const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16):''; pLbl.appendChild(pIn); form.appendChild(pLbl);
+    const pIn=document.createElement('input'); pIn.type='datetime-local'; pIn.value=row.published_at? new Date(row.published_at).toISOString().slice(0,16): ''; pLbl.appendChild(pIn); form.appendChild(pLbl);
 
     // Actions
     const actions = document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
@@ -2861,8 +2861,8 @@ function openReportModal(row){
 
     saveBtn.addEventListener('click', async (e)=>{
       e.preventDefault();
-      const title = String(tIn.value||'').trim(); if (!title) return alert('Başlık gerekli');
-      let file_url = String(fIn.value||'').trim();
+      const title = String(tIn.value|| '').trim(); if (!title) return alert('Başlık gerekli');
+      let file_url = String(fIn.value|| '').trim();
       const status = stSel.value || 'draft';
       const published_at = pIn.value ? new Date(pIn.value).toISOString() : null;
       try {
@@ -2919,7 +2919,7 @@ function openReportModal(row){
       const panels = qsa('.tab-panel');
       panels.forEach(el => el.classList.remove('active'));
       const target = qs(`#tab-${active}`);
-      if (target){ target.classList.add('active'); target.style.display=''; }
+      if (target){ target.classList.add('active'); target.style.display= ''; }
       // set tab button active class
       qsa('.tabs button').forEach(b => b.classList.remove('active'));
       const btn = qs(`.tabs button[data-tab="${active}"]`);
@@ -2968,7 +2968,8 @@ function openReportModal(row){
         }
       });
       if (!allowed.has(currentTab) && !(currentAdmin.roles||[]).includes('superadmin')){
-        enforceTabsVisibility('news');
+        const first = (currentAdmin.allowed_tabs||[]).find(t => allowed.has(t)) || defaultTabs.find(t => allowed.has(t)) || 'news';
+        enforceTabsVisibility(first);
       }
     }catch{}
   }
@@ -2983,7 +2984,14 @@ function openReportModal(row){
         currentAdmin = await loadAdminPermissions(data.session.user.email);
         applyTabPermissions();
         // ensure initial tab
-        enforceTabsVisibility(currentTab || 'news');
+        try{
+          const defaultTabs = ['news','ann','msgs','pages','posters','reports','founders','chairman', 'members','users','settings'];
+          const isSuper = (currentAdmin.roles||[]).includes('superadmin');
+          const allowed = new Set((currentAdmin.allowed_tabs||[]).length && !isSuper ? currentAdmin.allowed_tabs : defaultTabs);
+          const order = ((currentAdmin.allowed_tabs||[]).length && !isSuper) ? currentAdmin.allowed_tabs : defaultTabs;
+          const firstTab = order.find(t => allowed.has(t)) || 'news';
+          enforceTabsVisibility(firstTab);
+        }catch{ enforceTabsVisibility('news'); }
         await refreshTab();
       } else {
         showLogin();
@@ -3011,13 +3019,18 @@ function openReportModal(row){
       const emailIn = form.querySelector('input[name="email"]');
       const passIn = form.querySelector('input[name="password"]');
       if (emailIn) { emailIn.autocomplete='off'; emailIn.setAttribute('autocapitalize','none'); emailIn.setAttribute('spellcheck','false'); }
-      if (passIn) { passIn.autocomplete='new-password'; passIn.setAttribute('inputmode','tel'); }
+      if (passIn) {
+        // Ensure normal keyboard shows on mobile for password input
+        try{ passIn.autocomplete = 'current-password'; }catch{}
+        try{ passIn.removeAttribute('inputmode'); }catch{}
+        try{ passIn.setAttribute('autocapitalize','none'); passIn.setAttribute('spellcheck','false'); }catch{}
+      }
     }catch{}
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
-      const email = String(fd.get('email')||'').trim();
-      const password = String(fd.get('password')||'').trim();
+      const email = String(fd.get('email')|| '').trim();
+      const password = String(fd.get('password')|| '').trim();
       if (!email || !password) return;
       const submitBtn = form.querySelector('button[type="submit"]');
       if (submitBtn) submitBtn.disabled = true;
@@ -3034,7 +3047,7 @@ function openReportModal(row){
           await attempt();
         }catch(err1){
           // transient NetworkError retry once
-          const msg = (err1?.message||'').toLowerCase();
+          const msg = (err1?.message|| '').toLowerCase();
           if (msg.includes('network') || msg.includes('failed to fetch')){
             await new Promise(r=>setTimeout(r,300));
             await attempt();
@@ -3062,7 +3075,7 @@ async function loadAdminChairman(){
     }
 
     // Fetch latest single record
-    let row = { id:null, photo_url:'', message_html:'', status:'draft' };
+    let row = { id:null, photo_url:', message_html:', status:'draft' };
     try{
       const { data } = await sb()
         .from('chairman')
@@ -3089,10 +3102,10 @@ async function loadAdminChairman(){
     prev.style.border='1px solid #e5e7eb'; prev.style.borderRadius='10px'; prev.style.overflow='hidden'; prev.style.backgroundRepeat='no-repeat'; prev.style.backgroundPosition='center center'; prev.style.backgroundSize='cover';
     left.appendChild(prev);
 
-    const iUrl = document.createElement('input'); iUrl.type='url'; iUrl.placeholder='https://... (opsiyonel)'; iUrl.value = stripPhotoKey(row.photo_url||''); left.appendChild(iUrl);
+    const iUrl = document.createElement('input'); iUrl.type='url'; iUrl.placeholder='https://... (opsiyonel)'; iUrl.value = stripPhotoKey(row.photo_url|| ''); left.appendChild(iUrl);
     const iFile = document.createElement('input'); iFile.type='file'; iFile.accept='image/*'; left.appendChild(iFile);
 
-    const meta0 = parsePhotoMeta(row.photo_url||'');
+    const meta0 = parsePhotoMeta(row.photo_url|| '');
     const zLbl = document.createElement('label'); zLbl.style.display='grid'; zLbl.style.gap='4px'; zLbl.innerHTML='<span>Yakınlık</span>';
     const zRange = document.createElement('input'); zRange.type='range'; zRange.min='0.30'; zRange.max='2.00'; zRange.step='0.01'; zRange.value=String(meta0.z||1); zLbl.appendChild(zRange); left.appendChild(zLbl);
 
@@ -3154,7 +3167,7 @@ async function loadAdminChairman(){
    const rTitle = document.createElement('div'); rTitle.textContent='Mesaj Metni'; rTitle.style.fontWeight='600'; right.appendChild(rTitle);
 
    const tb=document.createElement('div'); tb.style.display='flex'; tb.style.flexWrap='wrap'; tb.style.gap='6px'; tb.style.margin='6px 0';
-   const ed=document.createElement('div'); ed.contentEditable='true'; ed.className='card'; ed.style.minHeight='260px'; ed.style.padding='10px'; ed.style.overflow='auto'; ed.innerHTML = (row.message_html||'');
+   const ed=document.createElement('div'); ed.contentEditable='true'; ed.className='card'; ed.style.minHeight='260px'; ed.style.padding='10px'; ed.style.overflow='auto'; ed.innerHTML = (row.message_html|| '');
    function btn(label, title, on){ const b=document.createElement('button'); b.type='button'; b.className='btn btn-outline'; b.textContent=label; b.title=title; b.style.padding='6px 10px'; b.addEventListener('click', (e)=>{ e.preventDefault(); on(); ed.focus(); }); return b; }
    function applyBlock(cmd){ document.execCommand(cmd,false,null); }
    tb.appendChild(btn('B','Kalın', ()=> applyBlock('bold')));
@@ -3182,7 +3195,7 @@ async function loadAdminChairman(){
    saveBtn.addEventListener('click', async (e)=>{
      e.preventDefault();
      try{
-       let photoUrl = String(iUrl.value||'').trim() || stripPhotoKey(row.photo_url||'');
+       let photoUrl = String(iUrl.value|| '').trim() || stripPhotoKey(row.photo_url|| '');
        const f = iFile.files && iFile.files[0];
        if (f){
          const ext = (f.name.split('.').pop()||'jpg').toLowerCase();
@@ -3191,7 +3204,7 @@ async function loadAdminChairman(){
        }
        const meta = { z: Number(zRange.value||1), ox: Number(oxRange.value||0), oy: Number(oyRange.value||0) };
        const finalPhoto = photoUrl ? buildPhotoValue(photoUrl, meta) : '';
-       const payload = { photo_url: finalPhoto, message_html: String(ed.innerHTML||'').trim(), status: stSel.value||'draft', updated_at: new Date().toISOString() };
+       const payload = { photo_url: finalPhoto, message_html: String(ed.innerHTML|| '').trim(), status: stSel.value||'draft', updated_at: new Date().toISOString() };
        const q = row.id
          ? sb().from('chairman').update(payload).eq('id', row.id)
          : sb().from('chairman').insert(payload).select('id').single();
@@ -3232,11 +3245,11 @@ async function loadAdminFounders(){
         <td>${img}</td>
         <td>${escapeHtml(row.name || '')}</td>
         <td>${Number(row.sort || '') || ''}</td>
-        <td>${escapeHtml(({published:'Yayımlandı',draft:'Taslak',scheduled:'Planlı',archived:'Arşivli',unpublished:'Yayından Kaldırıldı'}[String(row.status||'').toLowerCase()]||row.status||'draft'))}</td>
+        <td>${escapeHtml(({published:'Yayımlandı',draft:'Taslak',scheduled:'Planlı',archived:'Arşivli',unpublished:'Yayından Kaldırıldı'}[String(row.status|| '').toLowerCase()]||row.status||'draft'))}</td>
         <td class="actions">
           <button class="btn btn-warning" data-edit-founder="${row.id}">Düzenle</button>
           <button class="btn btn-danger" data-del-founder="${row.id}">Sil</button>
-          ${String(row.status||'').toLowerCase()==='published'
+          ${String(row.status|| '').toLowerCase()==='published'
             ? `<button class="btn btn-danger" data-unpub-founder="${row.id}">Yayından Kaldır</button>` 
             : `<button class="btn btn-success" data-pub-founder="${row.id}">Yayınla</button>` 
           }
@@ -3249,7 +3262,7 @@ async function loadAdminFounders(){
     if (addBtn && !addBtn.dataset.wired){
       addBtn.dataset.wired = '1';
       addBtn.onclick = () =>
-        openFounderModal({ id: null, name: '', image_url: '', sort: (Date.now() % 1000), status: 'draft' });
+        openFounderModal({ id: null, name: ', image_url: ', sort: (Date.now() % 1000), status: 'draft' });
     }
 
     wireFoundersRowActions();
@@ -3268,7 +3281,7 @@ function wireFoundersRowActions(){
         const id = btn.getAttribute('data-edit-founder');
         try{
           const { data } = await sb().from('founders').select('*').eq('id', id).maybeSingle();
-          openFounderModal(data || { id, name:'', image_url:'', sort:1, status:'draft' });
+          openFounderModal(data || { id, name:', image_url:', sort:1, status:'draft' });
         }catch(e){
           alert('Açılamadı: ' + (e?.message || String(e)));
         }
@@ -3324,15 +3337,15 @@ function openFounderModal(row){
   try{
     row = row || { id: null, name: '', image_url: '', sort: 1, status: 'draft' };
     $modalTitle().textContent = row.id ? 'Kurucuyu Düzenle' : 'Yeni Kurucu';
-    const form = $modalForm(); form.innerHTML='';
+    const form = $modalForm(); form.innerHTML= '';
 
     // Ad Soyad
     const nLbl = document.createElement('label'); nLbl.style.display='grid'; nLbl.style.gap='6px'; nLbl.innerHTML='<span>Ad Soyad</span>';
-    const nIn = document.createElement('input'); nIn.value=row.name||''; nLbl.appendChild(nIn); form.appendChild(nLbl);
+    const nIn = document.createElement('input'); nIn.value=row.name|| ''; nLbl.appendChild(nIn); form.appendChild(nLbl);
 
     // Görsel (URL + Dosya Yükleme)
     const iLbl = document.createElement('label'); iLbl.style.display='grid'; iLbl.style.gap='6px'; iLbl.innerHTML='<span>Görsel URL</span>';
-    const iIn = document.createElement('input'); iIn.placeholder='https://...'; iIn.value=row.image_url||'';
+    const iIn = document.createElement('input'); iIn.placeholder='https://...'; iIn.value=row.image_url|| '';
     const iFile = document.createElement('input'); iFile.type='file'; iFile.accept='image/*';
     const iWrap = document.createElement('div'); iWrap.style.display='grid'; iWrap.style.gap='6px'; iWrap.appendChild(iIn); iWrap.appendChild(iFile); iLbl.appendChild(iWrap); form.appendChild(iLbl);
 
@@ -3515,6 +3528,13 @@ function openFounderModal(row){
  }
 }
 })();
+
+
+
+
+
+
+
 
 
 
