@@ -44,6 +44,7 @@
   let currentAdmin = { email:null, roles:[], allowed_tabs:[] };
   let editing = null; // { type: 'news'|'ann', id: string|null }
   let messagesById = new Map();
+  let currentMsgCategory = 'all';
 
 // Seçime inline stil uygula (ör. font-size)
 // NOTE: Tek bir kez, IIFE içinde üst seviye scope’a ekleyin.
@@ -266,17 +267,41 @@ function applyInlineStyle(prop, val){
         let tmr; input.addEventListener('keyup', (e)=>{ clearTimeout(tmr); tmr = setTimeout(reload, 300); if (e.key==='Enter') reload(); });
         btn.addEventListener('click', reload);
       }
+      // Wire pending/tümü filters once
+      const filt = qs('#membersFilters');
+      if (filt && !filt.dataset.wired){
+        filt.dataset.wired = '1';
+        filt.addEventListener('click', (ev)=>{
+          const b = ev.target && ev.target.closest ? ev.target.closest('button[data-mem-filter]') : null;
+          if (!b) return;
+          Array.from(filt.querySelectorAll('button')).forEach(x=> x.classList.remove('active'));
+          b.classList.add('active');
+          loadAdminMembers();
+        });
+      }
     }catch{}
 
     tbody.innerHTML= '';
     try{
       const term = (qs('#membersSearchInput')?.value || '').trim();
-      let q = sb().from('members').select('id, member_no, first_name, last_name, national_id, email, phone, status, join_date').order('member_no');
+      const currentFilter = (qs('#membersFilters .btn.active')?.getAttribute('data-mem-filter')) || 'all';
+      let q = sb().from('members').select('id, member_no, first_name, last_name, national_id, email, phone, status, join_date').order('member_no', { ascending:true, nullsFirst:true });
       if (term){
         const like = `%${term}%`;
         q = q.or(
           `first_name.ilike.${like},last_name.ilike.${like},national_id.ilike.${like}`
         );
+      }
+      // Filters
+      if (currentFilter === 'pending'){
+        // Pending by status
+        q = q.eq('status', 'pending');
+      } else if (currentFilter === 'active'){
+        // Approved active members only
+        q = q.eq('status', 'active').not('member_no', 'is', null);
+      } else if (currentFilter === 'passive'){
+        // Approved passive members only
+        q = q.eq('status', 'passive').not('member_no', 'is', null);
       }
       const { data, error } = await q;
       if (error) throw error;
@@ -284,11 +309,12 @@ function applyInlineStyle(prop, val){
         const tr=document.createElement('tr');
         const name = `${escapeHtml(row.first_name|| '')} ${escapeHtml(row.last_name|| '')}`.trim();
         const status = row.status || 'active';
-        const statusTr = status === 'active' ? 'Aktif' : 'Pasif';
+        const statusTr = status === 'active' ? 'Aktif' : (status === 'pending' ? 'Onay bekliyor' : 'Pasif');
         const toggleText = status === 'active' ? 'Pasife Al' : 'Aktife Al';
         const jd = row.join_date ? new Date(row.join_date).toLocaleDateString('tr-TR') : '-';
+        const isPending = (status === 'pending');
         tr.innerHTML = `
-          <td>${row.member_no||'-'}</td>
+          <td>${isPending ? '-' : (row.member_no||'-')}</td>
           <td>${name}<div class="muted" style="font-size:12px">${escapeHtml(row.national_id|| '')}</div></td>
           <td>${escapeHtml(row.email|| '')}</td>
           <td>${escapeHtml(row.phone|| '')}</td>
@@ -296,7 +322,8 @@ function applyInlineStyle(prop, val){
           <td>${jd}</td>
           <td class="actions">
             <button class="btn btn-warning" data-edit-mem="${row.id}">Düzenle</button>
-            <button class="btn btn-${status==='active'?'danger':'success'}" data-toggle-mem="${row.id}" data-status="${status}">${toggleText}</button>
+            ${!isPending ? `<button class="btn btn-${status==='active'?'danger':'success'}" data-toggle-mem="${row.id}" data-status="${status}">${toggleText}</button>` : ''}
+            ${isPending ? `<button class="btn btn-success" data-approve-mem="${row.id}">Üyeliği Onayla</button>` : ''}
             <button class="btn btn-primary" data-idcard-mem="${row.id}">Kimlik Göster</button>
           </td>`;
         tbody.appendChild(tr);
@@ -312,6 +339,20 @@ function applyInlineStyle(prop, val){
         const id = btn.getAttribute('data-edit-mem');
         const { data } = await sb().from('members').select('*').eq('id', id).maybeSingle();
         openMemberModal(data || { id:null, status:'active' });
+      });
+    });
+    tbody.querySelectorAll('button[data-approve-mem]').forEach(btn=>{
+      if (btn.dataset.wired) return; btn.dataset.wired='1';
+      btn.addEventListener('click', async ()=>{
+        const id = btn.getAttribute('data-approve-mem');
+        try{
+          if (!confirm('Bu üyeliği onaylamak istediğinize emin misiniz?')) return;
+          const memberNo = await nextMemberNo();
+          const today = new Date().toISOString().slice(0,10);
+          const { error } = await sb().from('members').update({ member_no: memberNo, join_date: today, status:'active' }).eq('id', id);
+          if (error) throw error;
+          loadAdminMembers();
+        }catch(err){ alert('Onaylama başarısız: ' + (err?.message||String(err))); }
       });
     });
     tbody.querySelectorAll('button[data-toggle-mem]').forEach(btn=>{
@@ -350,9 +391,16 @@ function applyInlineStyle(prop, val){
 
   async function nextMemberNo(){
     try{
-      const { data, error } = await sb().from('members').select('member_no').order('member_no', { ascending:false }).limit(1);
+      const { data, error } = await sb()
+        .from('members')
+        .select('member_no,status')
+        .not('member_no', 'is', null)
+        .neq('status', 'pending')
+        .order('member_no', { ascending:false, nullsFirst:false })
+        .limit(1);
       if (error) throw error;
-      const max = (data && data[0] && Number(data[0].member_no)) || 0;
+      const raw = (data && data[0] && data[0].member_no) != null ? Number(data[0].member_no) : 0;
+      const max = Number.isFinite(raw) ? raw : 0;
       return max + 1;
     }catch{ return 1; }
   }
@@ -397,23 +445,25 @@ function applyInlineStyle(prop, val){
       src = stripPhotoKey(src);
       // Try to extract the object key from a Supabase storage URL
       if (/^https?:\/\//i.test(src)){
-        const mm = src.match(/\/storage\/v1\/object\/(public|authenticated)\/member-photos\/([^?]+)/);
-        if (mm && mm[1] && mm[2]) {
+        // Match: /storage/v1/object/(public|authenticated)/<bucket>/<key>
+        const mm = src.match(/\/storage\/v1\/object\/(public|authenticated)\/([^\/]+)\/([^?]+)/);
+        if (mm && mm[1] && mm[2] && mm[3]) {
           const kind = mm[1]; // 'public' | 'authenticated'
-          const key = decodeURIComponent(mm[2]);
+          const bucket = decodeURIComponent(mm[2]);
+          const key = decodeURIComponent(mm[3]);
           if (kind === 'public') {
             // Public URL'yi olduğu gibi kullan (CORS düzgün gelir)
             return src;
           }
-          // authenticated vb. ise imzala
-          const { data, error } = await sb().storage.from('member-photos').createSignedUrl(key, 60*60);
+          // authenticated vb. ise bulunduğu bucket üzerinden imzala
+          const { data, error } = await sb().storage.from(bucket).createSignedUrl(key, 60*60);
           if (!error && data?.signedUrl) return data.signedUrl;
           return src;
         }
         // Non-supabase URL: return as-is
         return src;
       }
-      // If it's not a URL, treat it as an object key inside the bucket
+      // If it's not a URL, treat it as an object key inside the default member-photos bucket
       const key = String(src).replace(/^\/+/, '');
       const { data, error } = await sb().storage.from('member-photos').createSignedUrl(key, 60*60);
       if (!error && data?.signedUrl) return data.signedUrl;
@@ -490,7 +540,7 @@ function parsePhotoMetaMobile(v){
 
   function openMemberModal(row){
     editing = { type:'member', id: row.id };
-    $modalTitle().textContent = row.id ? 'Üyeyi Düzenle' : 'Yeni Üye';
+    $modalTitle().textContent = row.id ? 'Üyeyi Düzenle' : 'Üyelik Başvuru Formu';
     $modalForm().innerHTML= '';
     const form = $modalForm();
 
@@ -706,10 +756,12 @@ function parsePhotoMetaMobile(v){
         });
       }
     }catch{}
-    // Dates & status
-    form.appendChild(inputEl('Üye Kayıt Tarihi', 'join_date', row.join_date||new Date().toISOString().slice(0,10), 'date'));
-    form.appendChild(inputEl('Üyelikten Ayrılış Tarihi', 'leave_date', row.leave_date||'', 'date'));
-    form.appendChild(selectEl('Durum', 'status', row.status||'active', [ {v:'active',t:'Aktif'}, {v:'passive',t:'Pasif'} ]));
+    // Dates & status (only in edit mode)
+    if (row.id){
+      form.appendChild(inputEl('Üye Kayıt Tarihi', 'join_date', row.join_date||new Date().toISOString().slice(0,10), 'date'));
+      form.appendChild(inputEl('Üyelikten Ayrılış Tarihi', 'leave_date', row.leave_date||'', 'date'));
+      form.appendChild(selectEl('Durum', 'status', row.status||'active', [ {v:'active',t:'Aktif'}, {v:'passive',t:'Pasif'} ]));
+    }
         // Files
     const photoLabel = document.createElement("label"); photoLabel.style.display="grid"; photoLabel.style.gap="6px"; photoLabel.innerHTML = "<span>Fotoğraf</span>";
     const photoPrev = document.createElement("img");
@@ -740,71 +792,74 @@ function parsePhotoMetaMobile(v){
       const url = URL.createObjectURL(f);
       photoPrev.src = url; photoPrev.style.display="block";
     });
-    // Crop controls for ID card (circle) — uses data attributes read by save logic
-    const cropWrap = document.createElement("div"); cropWrap.className="card"; cropWrap.style.padding="10px"; cropWrap.style.display="grid"; cropWrap.style.gap="8px"; cropWrap.style.marginTop="8px";
-    const cropTitle = document.createElement("div"); cropTitle.textContent="Kimlik Fotoğraf Kadrajı"; cropTitle.style.fontWeight="600"; cropWrap.appendChild(cropTitle);
-    const initMeta = parsePhotoMeta(row.photo_url||"");
-    const zoomLbl = document.createElement("label"); zoomLbl.style.display="grid"; zoomLbl.style.gap="4px"; zoomLbl.innerHTML="<span>Yakınlık</span>";
-    const zoomRange = document.createElement("input"); zoomRange.type="range"; zoomRange.min="0.30"; zoomRange.max="2.00"; zoomRange.step="0.01"; zoomRange.value=String(initMeta.z||1); zoomRange.setAttribute("data-photo-zoom","1");
-    zoomLbl.appendChild(zoomRange); cropWrap.appendChild(zoomLbl);
-    const oyLbl = document.createElement("label"); oyLbl.style.display="grid"; oyLbl.style.gap="4px"; oyLbl.innerHTML="<span>Dikey Ofset</span>";
-    const oyRange = document.createElement("input"); oyRange.type="range"; oyRange.min="-160"; oyRange.max="160"; oyRange.step="1"; oyRange.value=String(initMeta.oy||0); oyRange.setAttribute("data-photo-oy","1");
-    oyLbl.appendChild(oyRange); cropWrap.appendChild(oyLbl);
-    const oxLbl = document.createElement("label"); oxLbl.style.display="grid"; oxLbl.style.gap="4px"; oxLbl.innerHTML="<span>Yatay Ofset</span>";
-    const oxRange = document.createElement("input"); oxRange.type="range"; oxRange.min="-160"; oxRange.max="160"; oxRange.step="1"; oxRange.value=String(initMeta.ox||0); oxRange.setAttribute("data-photo-ox","1");
-    oxLbl.appendChild(oxRange); cropWrap.appendChild(oxLbl);
-    const circPrev = document.createElement("canvas"); circPrev.width=160; circPrev.height=160; circPrev.style.borderRadius="50%"; circPrev.style.border="1px solid #e5e7eb"; cropWrap.appendChild(circPrev);
-    form.appendChild(cropWrap);
+    // Crop controls (only in edit mode)
+    if (row.id){
+      const cropWrap = document.createElement("div"); cropWrap.className="card"; cropWrap.style.padding="10px"; cropWrap.style.display="grid"; cropWrap.style.gap="8px"; cropWrap.style.marginTop="8px";
+      const cropTitle = document.createElement("div"); cropTitle.textContent="Kimlik Fotoğraf Kadrajı"; cropTitle.style.fontWeight="600"; cropWrap.appendChild(cropTitle);
+      const initMeta = parsePhotoMeta(row.photo_url||"");
+      const zoomLbl = document.createElement("label"); zoomLbl.style.display="grid"; zoomLbl.style.gap="4px"; zoomLbl.innerHTML="<span>Yakınlık</span>";
+      const zoomRange = document.createElement("input"); zoomRange.type="range"; zoomRange.min="0.30"; zoomRange.max="2.00"; zoomRange.step="0.01"; zoomRange.value=String(initMeta.z||1); zoomRange.setAttribute("data-photo-zoom","1");
+      zoomLbl.appendChild(zoomRange); cropWrap.appendChild(zoomLbl);
+      const oyLbl = document.createElement("label"); oyLbl.style.display="grid"; oyLbl.style.gap="4px"; oyLbl.innerHTML="<span>Dikey Ofset</span>";
+      const oyRange = document.createElement("input"); oyRange.type="range"; oyRange.min="-160"; oyRange.max="160"; oyRange.step="1"; oyRange.value=String(initMeta.oy||0); oyRange.setAttribute("data-photo-oy","1");
+      oyLbl.appendChild(oyRange); cropWrap.appendChild(oyLbl);
+      const oxLbl = document.createElement("label"); oxLbl.style.display="grid"; oxLbl.style.gap="4px"; oxLbl.innerHTML="<span>Yatay Ofset</span>";
+      const oxRange = document.createElement("input"); oxRange.type="range"; oxRange.min="-160"; oxRange.max="160"; oxRange.step="1"; oxRange.value=String(initMeta.ox||0); oxRange.setAttribute("data-photo-ox","1");
+      oxLbl.appendChild(oxRange); cropWrap.appendChild(oxLbl);
+      const circPrev = document.createElement("canvas"); circPrev.width=160; circPrev.height=160; circPrev.style.borderRadius="50%"; circPrev.style.border="1px solid #e5e7eb"; cropWrap.appendChild(circPrev);
+      form.appendChild(cropWrap);
 
-    let circImg = null;
-    async function ensureCircImg(){
-      if (circImg) return circImg;
-      try{
-        if (photoInput.files && photoInput.files[0]){
-          circImg = await new Promise((res)=>{ const i=new Image(); i.onload=()=>res(i); try{ i.src = URL.createObjectURL(photoInput.files[0]); }catch{ res(null);} });
+      let circImg = null;
+      async function ensureCircImg(){
+        if (circImg) return circImg;
+        try{
+          if (photoInput.files && photoInput.files[0]){
+            circImg = await new Promise((res)=>{ const i=new Image(); i.onload=()=>res(i); try{ i.src = URL.createObjectURL(photoInput.files[0]); }catch{ res(null);} });
+            return circImg;
+          }
+          if (row.photo_url){
+            try{
+              const u = await resolveMemberPhotoUrl(row.photo_url);
+              circImg = await new Promise((res)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=u; });
+              if (circImg) return circImg;
+            }catch{}
+          }
+          const fb = __computeMemberFallbackByGender();
+          circImg = await new Promise((res)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=fb; });
           return circImg;
-        }
-        if (row.photo_url){
-          try{
-            const u = await resolveMemberPhotoUrl(row.photo_url);
-            circImg = await new Promise((res)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=u; });
-            if (circImg) return circImg;
-          }catch{}
-        }
-        const fb = __computeMemberFallbackByGender();
-        circImg = await new Promise((res)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=fb; });
-        return circImg;
-      }catch{}
-      return null;
+        }catch{}
+        return null;
+      }
+      async function drawCircPrev(){
+        const ctx = circPrev.getContext("2d");
+        ctx.clearRect(0,0,160,160);
+        ctx.save(); ctx.beginPath(); ctx.arc(80,80,78,0,Math.PI*2); ctx.closePath(); ctx.clip();
+        const img = await ensureCircImg();
+        if (!img){ ctx.fillStyle="#e5e7eb"; ctx.fillRect(0,0,160,160); ctx.restore(); return; }
+        const R = 78; const baseScale = Math.max((R*2)/img.width, (R*2)/img.height);
+        let scale = baseScale * Number(zoomRange.value||1);
+        if (img.width*scale < R*2 || img.height*scale < R*2) scale = baseScale;
+        const w = img.width*scale, h = img.height*scale;
+        const x = 80 - w/2 + Number(oxRange.value||0);
+        const y = 80 - h/2 + Number(oyRange.value||0);
+        try{ ctx.drawImage(img, x, y, w, h); }catch{}
+        ctx.restore();
+        ctx.beginPath(); ctx.arc(80,80,78,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle="#0ea5b1"; ctx.lineWidth=3; ctx.stroke();
+        ctx.beginPath(); ctx.arc(80,80,72,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle="#fb923c"; ctx.lineWidth=2; ctx.stroke();
+      }
+      drawCircPrev();
+      [zoomRange, oyRange, oxRange].forEach(el=> el.addEventListener("input", drawCircPrev));
+      if (genderSel){
+        genderSel.addEventListener("change", ()=>{
+          if (!(photoInput.files && photoInput.files[0]) && !row.photo_url){
+            try{ photoPrev.src = __computeMemberFallbackByGender(); photoPrev.style.display="block"; }catch{}
+            circImg = null; ensureCircImg().then(()=>drawCircPrev());
+          }
+        });
+      }
+      photoInput.addEventListener("change", ()=>{ circImg=null; ensureCircImg().then(()=>drawCircPrev()); try{ if (photoInput.files && photoInput.files[0]){ photoPrev.src = URL.createObjectURL(photoInput.files[0]); photoPrev.style.display="block"; } }catch{} });
     }
-    async function drawCircPrev(){
-      const ctx = circPrev.getContext("2d");
-      ctx.clearRect(0,0,160,160);
-      ctx.save(); ctx.beginPath(); ctx.arc(80,80,78,0,Math.PI*2); ctx.closePath(); ctx.clip();
-      const img = await ensureCircImg();
-      if (!img){ ctx.fillStyle="#e5e7eb"; ctx.fillRect(0,0,160,160); ctx.restore(); return; }
-      const R = 78; const baseScale = Math.max((R*2)/img.width, (R*2)/img.height);
-      let scale = baseScale * Number(zoomRange.value||1);
-      if (img.width*scale < R*2 || img.height*scale < R*2) scale = baseScale;
-      const w = img.width*scale, h = img.height*scale;
-      const x = 80 - w/2 + Number(oxRange.value||0);
-      const y = 80 - h/2 + Number(oyRange.value||0);
-      try{ ctx.drawImage(img, x, y, w, h); }catch{}
-      ctx.restore();
-      ctx.beginPath(); ctx.arc(80,80,78,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle="#0ea5b1"; ctx.lineWidth=3; ctx.stroke();
-      ctx.beginPath(); ctx.arc(80,80,72,0,Math.PI*2); ctx.closePath(); ctx.strokeStyle="#fb923c"; ctx.lineWidth=2; ctx.stroke();
-    }
-    drawCircPrev();
-    [zoomRange, oyRange, oxRange].forEach(el=> el.addEventListener("input", drawCircPrev));
-    if (genderSel){
-      genderSel.addEventListener("change", ()=>{
-        if (!(photoInput.files && photoInput.files[0]) && !row.photo_url){
-          try{ photoPrev.src = __computeMemberFallbackByGender(); photoPrev.style.display="block"; }catch{}
-          circImg = null; ensureCircImg().then(()=>drawCircPrev());
-        }
-      });
-    }
-    photoInput.addEventListener("change", ()=>{ circImg=null; ensureCircImg().then(()=>drawCircPrev()); try{ if (photoInput.files && photoInput.files[0]){ photoPrev.src = URL.createObjectURL(photoInput.files[0]); photoPrev.style.display="block"; } }catch{} });const docLabel = document.createElement('label'); docLabel.style.display='grid'; docLabel.style.gap='6px'; docLabel.innerHTML = '<span>Belgeler</span>';
+    const docLabel = document.createElement('label'); docLabel.style.display='grid'; docLabel.style.gap='6px'; docLabel.innerHTML = '<span>Belgeler</span>';
     const docInput = document.createElement('input'); docInput.type='file'; docInput.multiple=true; docLabel.appendChild(docInput); form.appendChild(docLabel);
 
     const docsPrev = document.createElement('div');
@@ -887,9 +942,9 @@ function parsePhotoMetaMobile(v){
         ssk_no: String(fd.get('ssk_no')|| '').trim(),
         email: String(fd.get('email')|| '').trim().toLowerCase() || null, // Normalize optional email: lowercase and send null if empty
         phone: String(fd.get('phone')|| '').trim(),
-        join_date: String(fd.get('join_date')|| '').trim() || new Date().toISOString().slice(0,10),
-        leave_date: String(fd.get('leave_date')|| '').trim() || null,
-        status: String(fd.get('status')||'active')
+        join_date: row.id ? (String(fd.get('join_date')|| '').trim() || new Date().toISOString().slice(0,10)) : null,
+        leave_date: row.id ? (String(fd.get('leave_date')|| '').trim() || null) : null,
+        status: row.id ? String(fd.get('status')||'active') : 'active'
       };
       // Generic cleanup: convert empty strings to null to avoid DB CHECK issues
       Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null; });
@@ -930,6 +985,8 @@ function parsePhotoMetaMobile(v){
       }
       if (payload.email && !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(payload.email)) return alert('Geçerli bir e‑posta giriniz');
       if (payload.email === null) { delete payload.email; }
+      // Business rule: at least one of retirement_no or ssk_no must be provided
+      if (!payload.retirement_no && !payload.ssk_no){ return alert('Emekli Sandığı Sicil No veya SSK No alanlarından en az biri dolu olmalıdır.'); }
 
       // Handle uploads: photo and documents
       try{
@@ -990,7 +1047,14 @@ if (editing && editing.id) {
     .select('id')
     .maybeSingle();
 } else {
-  // Yeni üye: INSERT
+  // Yeni üye: Admin panelinden ekleniyor -> hemen üye numarası ve katılım tarihi atanır
+  try{
+    const memberNo = await nextMemberNo();
+    const today = new Date().toISOString().slice(0,10);
+    payload.member_no = memberNo;
+    if (!payload.join_date) payload.join_date = today;
+    if (!payload.status) payload.status = 'active';
+  }catch{}
   resp = await sb().from('members')
     .insert(payload)
     .select('id')
@@ -1070,6 +1134,8 @@ await loadAdminMembers();
         const C_ORANGE = '#fb923c';
         const C_TEXT = '#0f172a';
         const C_MUTED = '#6b7280';
+        const C_RED = '#E03B3B';
+        const C_BLUE = '#0B3A60';
 
         // Background + rounded corners clip (exported PNG is also rounded)
         ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -1129,7 +1195,7 @@ await loadAdminMembers();
           if (logoUrl){
             const lg=await loadImg(bust(logoUrl));
 
-            const lx = 26, ly = 100, lr = 56; // konum ve yarıçap
+            const lx = 26, ly = 58, lr = 56; // konum ve yarıçap
             // Daire kırp
             ctx.save();
             ctx.beginPath();
@@ -1147,7 +1213,7 @@ await loadAdminMembers();
           // Headings: first two orange, third teal 'İLKE-SEN'
          // Logoyla çakışmayı önlemek için min sol kenar: logo sağ ucu + 8px
         const baseX = canvas.width / 2 + 20;
-        const lx = 26, ly = 100, lr = 56;                 // logo konumları (yukarıda kullandıklarımız)
+        const lx = 26, ly = 58, lr = 56;                 // logo konumları (yukarıda kullandıklarımız)
         const circleRight = lx + lr * 2;
         const minLeft = circleRight + 8;                  // metnin sol kenarı en az bu değerin sağında olmalı
 
@@ -1160,12 +1226,12 @@ await loadAdminMembers();
         ctx.textAlign = 'center';
 
         // İLKE-SEN – biraz daha yukarı
-        ctx.fillStyle = C_TEAL;
+        ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 42px Inter, Arial, sans-serif';
         ctx.fillText('İLKE-SEN', centeredX('İLKE-SEN'), ly + lr - 28);
 
         // Turuncu başlık 1 – logonun yatay merkezine hizalı (ly + lr)
-        ctx.fillStyle = C_ORANGE;
+        ctx.fillStyle = C_RED;
         ctx.font = 'bold 20px Inter, Arial, sans-serif';
         const line1 = 'İLKELİ YEREL YÖNETİM HİZMETLERİ KOLU';
         ctx.fillText(line1, centeredX(line1), ly + lr);        // 156
@@ -1177,12 +1243,12 @@ await loadAdminMembers();
         // Photo circle centered (continues…)
         const photoCX = canvas.width/2;
         // Match template circular hole (bigger, slightly lower) and eliminate edge gaps
-        const photoCY = useVector ? 338 : 432;
+        const photoCY = useVector ? 312 : 406; // 1 satır (~26px) yukarı
         const photoR = useVector ? 84 : 180; // significantly increased to fill the frame
         ctx.save();
         if (useVector){
-          ctx.beginPath(); ctx.arc(photoCX, photoCY, photoR+10, 0, Math.PI*2); ctx.closePath(); ctx.strokeStyle=C_TEAL; ctx.lineWidth=6; ctx.stroke();
-          ctx.beginPath(); ctx.arc(photoCX, photoCY, photoR+2, 0, Math.PI*2); ctx.closePath(); ctx.strokeStyle=C_ORANGE; ctx.lineWidth=4; ctx.stroke();
+          ctx.beginPath(); ctx.arc(photoCX, photoCY, photoR+10, 0, Math.PI*2); ctx.closePath(); ctx.strokeStyle=C_BLUE; ctx.lineWidth=6; ctx.stroke();
+          ctx.beginPath(); ctx.arc(photoCX, photoCY, photoR+2, 0, Math.PI*2); ctx.closePath(); ctx.strokeStyle=C_RED; ctx.lineWidth=4; ctx.stroke();
         }
         ctx.beginPath(); ctx.arc(photoCX, photoCY, photoR, 0, Math.PI*2); ctx.closePath(); ctx.clip();
         try{
@@ -1245,36 +1311,36 @@ await loadAdminMembers();
           ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6; ctx.stroke();
           // teal ring
           ctx.beginPath(); ctx.arc(photoCX, photoCY, photoR+1, 0, Math.PI*2); ctx.closePath();
-          ctx.strokeStyle = C_TEAL; ctx.lineWidth = 4; ctx.stroke();
-          // inner orange ring
+          ctx.strokeStyle = C_BLUE; ctx.lineWidth = 4; ctx.stroke();
+          // inner red ring
           ctx.beginPath(); ctx.arc(photoCX, photoCY, photoR-4, 0, Math.PI*2); ctx.closePath();
-          ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 3; ctx.stroke();
+          ctx.strokeStyle = C_RED; ctx.lineWidth = 3; ctx.stroke();
           ctx.restore();
         }
         // Name area: in template we only print texts (no banner), in vector we draw banner
         ctx.textAlign='center';
         if (useVector){
-          const bannerW = canvas.width - 120, bannerH = 54, bannerX=(canvas.width-bannerW)/2, bannerY=photoCY+photoR+24;
+          const bannerW = canvas.width - 120, bannerH = 54, bannerX=(canvas.width-bannerW)/2, bannerY=photoCY+photoR+24 - 26; // isim 2 satır yukarı: +26 ekstra
           ctx.save(); roundRect(ctx, bannerX, bannerY, bannerW, bannerH, 10); ctx.clip();
           ctx.fillStyle=C_TEAL; ctx.fill(); ctx.restore();
-          ctx.fillStyle = '#ffffff'; ctx.font = 'bold 28px Inter, Arial, sans-serif';
+          ctx.fillStyle = C_BLUE; ctx.font = 'bold 28px Inter, Arial, sans-serif';
           ctx.fillText(`${(member.first_name|| '').toUpperCase()} ${(member.last_name|| '').toUpperCase()}`.trim(), canvas.width/2, bannerY+34);
-          if (member.title){ ctx.fillStyle = C_ORANGE; ctx.font='bold 22px Inter, Arial, sans-serif'; ctx.fillText(String(member.title).toUpperCase(), canvas.width/2, bannerY+58); }
+          if (member.title){ ctx.fillStyle = C_RED; ctx.font='bold 22px Inter, Arial, sans-serif'; ctx.fillText(String(member.title).toUpperCase(), canvas.width/2, bannerY+58); }
         } else {
           // Shifted further down by ~24px from previous
-          ctx.fillStyle = C_TEAL; ctx.font = 'bold 28px Inter, Arial, sans-serif';
-          ctx.fillText(`${(member.first_name|| '').toUpperCase()} ${(member.last_name|| '').toUpperCase()}`.trim(), canvas.width/2, photoCY+photoR+88);
-          if (member.title){ ctx.fillStyle = C_ORANGE; ctx.font='bold 22px Inter, Arial, sans-serif'; ctx.fillText(String(member.title).toUpperCase(), canvas.width/2, photoCY+photoR+114); }
+          ctx.fillStyle = C_BLUE; ctx.font = 'bold 28px Inter, Arial, sans-serif';
+          ctx.fillText(`${(member.first_name|| '').toUpperCase()} ${(member.last_name|| '').toUpperCase()}`.trim(), canvas.width/2, photoCY+photoR+88 - 26);
+          if (member.title){ ctx.fillStyle = C_RED; ctx.font='bold 22px Inter, Arial, sans-serif'; ctx.fillText(String(member.title).toUpperCase(), canvas.width/2, photoCY+photoR+114 - 26); }
         }
         // Details and QR: if vector, draw white card; if template, print directly in template box
         const uyelik = member.join_date ? new Date(member.join_date).toLocaleDateString('tr-TR') : '-';
         if (useVector){
-          const cardX=32, cardY=(photoCY+photoR+24)+54+78, cardW=canvas.width-64, cardH=260;
+          const cardX=32, cardY=(photoCY+photoR+24)+54+78 - 26, cardW=canvas.width-64, cardH=260; // bilgiler 2 satır yukarı: +26 ekstra
           ctx.save(); roundRect(ctx, cardX, cardY, cardW, cardH, 12); ctx.fillStyle='#ffffff'; ctx.fill(); ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1; ctx.stroke(); ctx.restore();
-          ctx.textAlign='left'; const pad=16; const leftX=cardX+pad; let lineY=cardY+36;
-          ctx.fillStyle=C_ORANGE; ctx.font='bold 18px Inter, Arial, sans-serif'; ctx.fillText('Üye Numarası', leftX, lineY); ctx.fillStyle=C_TEXT; ctx.font='18px Inter, Arial, sans-serif'; ctx.fillText(`: ${member.member_no||'-'}`, leftX+140, lineY);
-          lineY+=32; ctx.fillStyle=C_ORANGE; ctx.font='bold 18px Inter, Arial, sans-serif'; ctx.fillText('Üyelik Tarihi', leftX, lineY); ctx.fillStyle=C_TEXT; ctx.font='18px Inter, Arial, sans-serif'; ctx.fillText(`: ${uyelik}`, leftX+140, lineY);
-          lineY+=32; ctx.fillStyle=C_ORANGE; ctx.font='bold 18px Inter, Arial, sans-serif'; ctx.fillText('TC. No', leftX, lineY); ctx.fillStyle=C_TEXT; ctx.font='18px Inter, Arial, sans-serif'; ctx.fillText(`: ${member.national_id||'-'}`, leftX+140, lineY);
+          ctx.textAlign='left'; const pad=16; const leftX=Math.floor(canvas.width*0.5); let lineY=cardY+36;
+          ctx.fillStyle=C_RED; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText('Üye Numarası', leftX, lineY); ctx.fillStyle=C_BLUE; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText(`: ${member.member_no||'-'}`, leftX+160, lineY);
+          lineY+=36; ctx.fillStyle=C_RED; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText('Üyelik Tarihi', leftX, lineY); ctx.fillStyle=C_BLUE; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText(`: ${uyelik}`, leftX+160, lineY);
+          lineY+=36; ctx.fillStyle=C_RED; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText('TC. No', leftX, lineY); ctx.fillStyle=C_BLUE; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText(`: ${member.national_id||'-'}`, leftX+160, lineY);
           try{
             async function buildVerifyUrl(){
               try{
@@ -1294,14 +1360,14 @@ const qrSize = 160;
 const padBR = 28;
 const cb = Date.now() + '-' + encodeURIComponent(member.verify_token || member.id); // cache-buster
 const qr = await loadImg(`https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&margin=0&data=${encodeURIComponent(url)}&cb=${cb}`);
-const qx = canvas.width - padBR - qrSize, qy = canvas.height - padBR - qrSize;
+const qx = padBR, qy = canvas.height - padBR - qrSize;
 ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         } else {
-          // template coordinates (shifted further down by ~24px)
-          ctx.textAlign='left'; let leftX=64, lineY=808; // two more lines down (2 x 32px)
-          ctx.fillStyle=C_ORANGE; ctx.font='bold 18px Inter, Arial, sans-serif'; ctx.fillText('Üye Numarası', leftX, lineY); ctx.fillStyle=C_TEXT; ctx.font='18px Inter, Arial, sans-serif'; ctx.fillText(`: ${member.member_no||'-'}`, leftX+140, lineY);
-          lineY+=32; ctx.fillStyle=C_ORANGE; ctx.font='bold 18px Inter, Arial, sans-serif'; ctx.fillText('Üyelik Tarihi', leftX, lineY); ctx.fillStyle=C_TEXT; ctx.font='18px Inter, Arial, sans-serif'; ctx.fillText(`: ${uyelik}`, leftX+140, lineY);
-          lineY+=32; ctx.fillStyle=C_ORANGE; ctx.font='bold 18px Inter, Arial, sans-serif'; ctx.fillText('TC. No', leftX, lineY); ctx.fillStyle=C_TEXT; ctx.font='18px Inter, Arial, sans-serif'; ctx.fillText(`: ${member.national_id||'-'}`, leftX+140, lineY);
+          // template coordinates
+          ctx.textAlign='left'; let leftX=Math.floor(canvas.width/2), lineY=808-52; // başlangıç: merkeze hizala, 2 satır yukarı
+          ctx.fillStyle=C_RED; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText('Üye Numarası', leftX, lineY); ctx.fillStyle=C_BLUE; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText(`: ${member.member_no||'-'}`, leftX+160, lineY);
+          lineY+=36; ctx.fillStyle=C_RED; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText('Üyelik Tarihi', leftX, lineY); ctx.fillStyle=C_BLUE; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText(`: ${uyelik}`, leftX+160, lineY);
+          lineY+=36; ctx.fillStyle=C_RED; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText('TC. No', leftX, lineY); ctx.fillStyle=C_BLUE; ctx.font='bold 20px Inter, Arial, sans-serif'; ctx.fillText(`: ${member.national_id||'-'}`, leftX+160, lineY);
           try{
             async function buildVerifyUrl(){
               try{
@@ -1321,14 +1387,41 @@ const qrSize = 160;
 const padBR = 28;
 const cb = Date.now() + '-' + encodeURIComponent(member.verify_token || member.id); // cache-buster
 const qr = await loadImg(`https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&margin=0&data=${encodeURIComponent(url)}&cb=${cb}`);
-const qx = canvas.width - padBR - qrSize, qy = canvas.height - padBR - qrSize;
+const qx = padBR, qy = canvas.height - padBR - qrSize;
 ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         }
         // finalize snapshot
         try{ window.__idcardLastPng = canvas.toDataURL('image/jpeg', 0.92); }catch{}
       })();
       function roundRect(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.save(); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath(); }
-      function loadImg(src){ return new Promise((res,rej)=>{ const i=new Image(); try{ if (/^https?:/i.test(String(src|| ''))){ const u = new URL(src, location.href); if (u.origin !== location.origin){ i.crossOrigin='anonymous'; } } }catch{} i.onload=()=>res(i); i.onerror=()=>rej(new Error('img load failed')); i.src=src; }); }
+      function loadImg(src){
+        return new Promise((res, rej) => {
+          (async () => {
+            try{
+              const raw = String(src||'');
+              let final = raw;
+              // Prefer blob via safeImageUrl when possible (prevents tainted canvas)
+              try{ if (window.safeImageUrl && /^https?:/i.test(raw)){ const su = await window.safeImageUrl(raw); if (su) final = su; } }catch{}
+              const i = new Image();
+              try{
+                // Only set CORS for known CORS-enabled hosts; blob/data/same-origin need no CORS
+                const isBlob = /^blob:/i.test(final);
+                const isData = /^data:/i.test(final);
+                if (!isBlob && !isData){
+                  const u = new URL(final, location.href);
+                  const same = (u.origin === location.origin);
+                  const host = u.host.toLowerCase();
+                  const shouldCORS = !same && /\.supabase\.co$/i.test(host);
+                  if (shouldCORS) i.crossOrigin = 'anonymous';
+                }
+              }catch{}
+              i.onload = () => res(i);
+              i.onerror = () => rej(new Error('img load failed'));
+              i.src = final;
+            }catch(e){ rej(e); }
+          })();
+        });
+      }
       function fileName(url){ try{ const u=new URL(url, location.origin); return u.pathname.split('/').pop()||'dosya'; }catch{ const parts=String(url|| '').split('/'); return parts[parts.length-1]||'dosya'; } }
       function renderExistingDocs(){
         docsPrev.innerHTML= '';
@@ -1345,7 +1438,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
           docsPrev.appendChild(card);
         });
       }
-      dlBtn.addEventListener('click',(e)=>{ e.preventDefault(); try{ const data=canvas.toDataURL('image/jpeg', 0.92); try{ window.__idcardLastPng = data; }catch{} const a=document.createElement('a'); a.download=`kimlik_${member.member_no||member.id||'uye'}.jpg`; a.href=data; a.click(); }catch{} });
+      dlBtn.addEventListener('click',(e)=>{ e.preventDefault(); try{ const data=canvas.toDataURL('image/jpeg', 0.92); try{ window.__idcardLastPng = data; }catch{} const a=document.createElement('a'); const fullName = `${(member.first_name||'').trim()} ${(member.last_name||'').trim()}`.trim() || (member.member_no||member.id||'uye'); let base = fullName.normalize('NFD').replace(/[\u0300-\u036f]/g,''); base = base.replace(/ı/g,'i').replace(/İ/g,'I').replace(/ş/g,'s').replace(/Ş/g,'S').replace(/ğ/g,'g').replace(/Ğ/g,'G').replace(/ç/g,'c').replace(/Ç/g,'C').replace(/ö/g,'o').replace(/Ö/g,'O').replace(/ü/g,'u').replace(/Ü/g,'U'); const safe = base.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); a.download=`kimlik_${safe||'uye'}.jpg`; a.href=data; a.click(); }catch{} });
       printBtn.addEventListener('click',(e)=>{ e.preventDefault(); try{ const w=window.open('','_blank'); if(!w) return; const data=canvas.toDataURL('image/jpeg', 0.92); try{ window.__idcardLastPng = data; }catch{} w.document.write(`<img src="${data}" style="max-width:100%" onload="window.print();setTimeout(()=>window.close(),300);"/>`); w.document.close(); }catch{} });
       sendBtn.addEventListener('click', async (e)=>{ e.preventDefault(); try{ window.__idcardLastPng = canvas.toDataURL('image/jpeg', 0.92); await sendDigitalIdCard(member.id); closeModal(); alert('Kimlik gönderim kuyruğa alındı.'); }catch(err){ alert('Kimlik gönderilemedi: ' + (err?.message||String(err))); } });
       closeBtn.addEventListener('click', (e)=>{ e.preventDefault(); closeModal(); });
@@ -1543,7 +1636,11 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         tbody.appendChild(tr);
       });
        // Wire: Yeni Sayfa
-    const addBtn = qs('#newPageBtn'); if (addBtn && !addBtn.dataset.wired){ addBtn.dataset.wired='1'; addBtn.onclick = ()=> openPageModal({ id:null, title:', slug:', status:'draft' }); }
+    const addBtn = qs('#newPageBtn');
+    if (addBtn && !addBtn.dataset.wired){
+      addBtn.dataset.wired='1';
+      addBtn.onclick = () => openPageModal({ id:null, title:'', slug:'', status:'draft', body:'', published_at:null, unpublish_at:null });
+    }
       wirePagesRowActions();
     }catch(e){ alert('Sayfalar yüklenemedi: ' + (e?.message||String(e))); }
   }
@@ -1582,7 +1679,9 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       // Body editor: Word-like toolbar + contentEditable area
       const bLbl=document.createElement('label'); bLbl.style.display='grid'; bLbl.style.gap='6px'; bLbl.innerHTML='<span>İçerik</span>';
       const tb=document.createElement('div'); tb.style.display='flex'; tb.style.flexWrap='wrap'; tb.style.gap='6px'; tb.style.margin='6px 0';
-      const ed=document.createElement('div'); ed.contentEditable='true'; ed.className='card'; ed.style.minHeight='240px'; ed.style.padding='10px'; ed.style.overflow='auto'; ed.innerHTML = (row.body|| '');
+      const ed=document.createElement('div'); ed.contentEditable='true'; ed.className='card'; ed.style.minHeight='240px'; ed.style.padding='10px'; ed.style.overflow='auto';
+      try{ ed.setAttribute('data-skip-safe-images','1'); }catch{}
+      ed.innerHTML = (row.body|| '');
       function btn(label, title, on){ const b=document.createElement('button'); b.type='button'; b.className='btn btn-outline'; b.textContent=label; b.title=title; b.style.padding='6px 10px'; b.addEventListener('click', (e)=>{ e.preventDefault(); on(); ed.focus(); }); return b; }
       function applyInlineStyle(prop, val){
         const sel = window.getSelection(); if (!sel || !sel.rangeCount) return;
@@ -1647,7 +1746,6 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         e.preventDefault();
         try{
           const payload = {
-            id: row.id || undefined,
             title: String(tIn.value|| '').trim(),
             slug: String(sIn.value|| '').trim(),
             body: String(ed.innerHTML|| '').trim(),
@@ -1803,7 +1901,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       if (error) throw error;
       (data||[]).forEach(row => {
         const tr = document.createElement('tr');
-        const thumb = row.image_url ? `<img src="${escapeHtml(bust(row.image_url))}" alt=" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;vertical-align:middle"/>` : '';
+        const thumb = row.image_url ? `<img src="${escapeHtml(bust(row.image_url))}" alt="${escapeHtml(row.title||'')}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;vertical-align:middle"/>` : '';
         const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı', active:'Yayımlandı' };
         const statusTr = statusMap[String(row.status|| '').toLowerCase()] || (row.status|| '');
         tr.innerHTML = `
@@ -1849,7 +1947,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       if (error) throw error;
       (data||[]).forEach(row => {
         const tr = document.createElement('tr');
-        const thumb = row.image_url ? `<img src="${escapeHtml(bust(row.image_url))}" alt=" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;vertical-align:middle"/>` : '';
+        const thumb = row.image_url ? `<img src="${escapeHtml(bust(row.image_url))}" alt="${escapeHtml(row.title||'')}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;vertical-align:middle"/>` : '';
         const statusMap = { published:'Yayımlandı', draft:'Taslak', scheduled:'Planlı', archived:'Arşivli', unpublished:'Yayından Kaldırıldı', active:'Yayımlandı' };
         const statusTr = statusMap[String(row.status|| '').toLowerCase()] || (row.status|| '');
         tr.innerHTML = `
@@ -1881,30 +1979,75 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       }
     }catch{}
 
+    // Wire category filter buttons
     try{
-      const { data, error } = await sb()
-        .from('messages')
-        .select('id, name, email, subject, body, created_at, is_read, is_replied')
-        .order('created_at', { ascending:false, nullsFirst:true });
-      if (error) throw error;
+      const group = document.getElementById('msgCatFilters');
+      if (group && !group.dataset.wired){
+        group.dataset.wired = '1';
+        group.addEventListener('click', (ev)=>{
+          const btn = ev.target && ev.target.closest ? ev.target.closest('[data-msg-cat]') : null;
+          if (!btn) return;
+          ev.preventDefault();
+          currentMsgCategory = btn.getAttribute('data-msg-cat') || 'all';
+          Array.from(group.querySelectorAll('button')).forEach(b=> b.classList.toggle('active', b===btn));
+          loadAdminMessages();
+        });
+      }
+    }catch{}
 
-      (data||[]).forEach(row => {
+    // Load messages with server-side category filter if column exists; fallback to client-side
+    let rows = [];
+    try{
+      let q = sb().from('messages').select('*').order('created_at', { ascending:false, nullsFirst:true });
+      if (currentMsgCategory && currentMsgCategory !== 'all') q = q.eq('category', currentMsgCategory);
+      { const { data, error } = await q; if (error) throw error; rows = data || []; }
+    }catch(e){
+      // Likely category column missing; fallback without filter and filter client-side by subject prefix
+      try{
+        const { data, error } = await sb().from('messages').select('id, name, email, subject, body, created_at, is_read, is_replied');
+        if (error) throw error; rows = data || [];
+      }catch(err){ alert('Mesajlar yüklenemedi: ' + (err?.message||String(err))); return; }
+    }
+
+    // Client-side filter if needed
+    function deriveCategory(r){
+      if (r && r.category) return String(r.category||'');
+      const s = String(r?.subject||'');
+      if (/^\s*\[Avukatl[ıi]k Talebi\]/i.test(s)) return 'lawyer';
+      if (/^\s*\[Üyelik Başvurusu\]/i.test(s)) return 'membership';
+      // Heuristics for other types can be added later
+      return 'contact';
+    }
+    const filtered = (currentMsgCategory && currentMsgCategory !== 'all')
+      ? rows.filter(r => (r?.category ? String(r.category) === currentMsgCategory : deriveCategory(r) === currentMsgCategory))
+      : rows;
+
+    try{
+      filtered.forEach(row => {
         try{ if (row && row.id) messagesById.set(row.id, row); }catch{}
         const tr = document.createElement('tr');
-        const tags = [];
-        if (row && row.is_read) tags.push('Okundu');
-        if (row && row.is_replied) tags.push('Cevaplandı');
-        const tagHtml = tags.length ? `<div class="muted" style="margin-top:4px">${escapeHtml(tags.join(' • '))}</div>` : '';
+        // Category + status badges
+        const map = { contact:'İletişim', email:'Mail', membership:'Üyelik Başvurusu', lawyer:'Avukatlık Talebi', meeting:'Görüşme Talebi', all:'Tümü' };
+        const cat = (row && row.category) ? String(row.category) : deriveCategory(row);
+        const catKey = (cat && map[cat]) ? cat : null;
+        const catClass = catKey && ['all','contact','email','membership','lawyer','meeting'].includes(catKey) ? `badge-${catKey}` : 'badge-neutral';
+        let badges = '';
+        if (catKey) badges += `<span class="badge ${catClass}">${escapeHtml(map[catKey])}</span>`;
+        if (row && row.is_read) badges += `<span class=\"badge badge-neutral\">Okundu</span>`;
+        if (row && row.is_replied) badges += `<span class=\"badge badge-neutral\">Cevaplandı</span>`;
+        const tagHtml = badges ? `<div class=\"badges\">${badges}</div>` : '';
         const when = row && row.created_at ? new Date(row.created_at).toLocaleString('tr-TR') : '-';
+        const subjectRaw = String(row?.subject || '');
+        const subjectClean = subjectRaw.replace(/^\s*\[[^\]]+\]\s*/, '').trim();
         tr.innerHTML = `
           <td>${escapeHtml(row?.name || '')}</td>
           <td>${escapeHtml(row?.email || '')}</td>
-          <td>${escapeHtml(row?.subject || '')}${tagHtml}</td>
+          <td>${escapeHtml(subjectClean)}${tagHtml}</td>
           <td>${when}</td>
           <td class="actions">
             <button class="btn btn-warning" data-view-msg="${row.id}">Oku</button>
             <button class="btn btn-success" data-reply-msg="${row.id}">Cevapla</button>
-            ${row && row.is_read ? '' : `<button class="btn btn-outline" data-read-msg="${row.id}">Okundu</button>`}
+            ${row && row.is_read ? '' : `<button class=\"btn btn-outline\" data-read-msg=\"${row.id}\">Okundu</button>`}
           </td>
         `;
         tbody.appendChild(tr);
@@ -1993,21 +2136,75 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         return lbl;
       }
 
-      wrap.appendChild(roInput('Ad', fullRow?.name || '', 'text'));
-      wrap.appendChild(roInput('E‑posta', fullRow?.email || '', 'email'));
-      wrap.appendChild(roInput('Konu', fullRow?.subject || '', 'text'));
-      wrap.appendChild(roInput('Tarih', fullRow?.created_at ? new Date(fullRow.created_at).toLocaleString('tr-TR') : '-', 'text'));
+      // Compute data used across rows
+      const map = { contact:'İletişim', email:'Mail', membership:'Üyelik Başvurusu', lawyer:'Avukatlık Talebi', meeting:'Görüşme Talebi' };
+      const subjStr = String(fullRow?.subject || '');
+      const subjClean = subjStr.replace(/^\s*\[[^\]]+\]\s*/,'').trim();
+      let cat = String(fullRow?.category||'');
+      if (!cat){
+        if (/^\s*\[Avukatl[ıi]k Talebi\]/i.test(subjStr)) cat = 'lawyer';
+        else if (/^\s*\[Üyelik Başvurusu\]/i.test(subjStr)) cat = 'membership';
+        else cat = 'contact';
+      }
+      const catLabel = map[cat] || '-';
 
-      const mLbl = document.createElement('label');
-      mLbl.style.display='grid';
-      mLbl.style.gap='6px';
-      mLbl.innerHTML = '<span>Mesaj</span>';
-      const ta = document.createElement('textarea');
-      ta.rows = 12;
-      ta.value = String(fullRow?.body || '');
-      ta.disabled = true;
-      mLbl.appendChild(ta);
-      wrap.appendChild(mLbl);
+      function parseMessageBody(raw){
+        const out = { ad:null, soyad:null, uyeNo:null, telefon:null, kurum:null, aciklama:null };
+        const txt = String(raw||'');
+        const lines = txt.split(/\r?\n/);
+        lines.forEach(line => {
+          let m;
+          if ((m = line.match(/^\s*Ad\s*:\s*(.*)$/i))) out.ad = m[1].trim();
+          else if ((m = line.match(/^\s*Soyad\s*:\s*(.*)$/i))) out.soyad = m[1].trim();
+          else if ((m = line.match(/^\s*Üye\s*No\s*:\s*(.*)$/i))) out.uyeNo = m[1].trim();
+          else if ((m = line.match(/^\s*Uye\s*No\s*:\s*(.*)$/i))) out.uyeNo = m[1].trim();
+          else if ((m = line.match(/^\s*Telefon\s*:\s*(.*)$/i))) out.telefon = m[1].trim();
+          else if ((m = line.match(/^\s*Kurum\s*:\s*(.*)$/i))) out.kurum = m[1].trim();
+        });
+        const idxDesc = lines.findIndex(l => /^\s*Açıklama\s*:/i.test(l) || /^\s*Aciklama\s*:/i.test(l));
+        if (idxDesc >= 0){ out.aciklama = lines.slice(idxDesc+1).join('\n').trim(); }
+        else { out.aciklama = txt.trim(); }
+        return out;
+      }
+
+      const parsed = parseMessageBody(fullRow?.body || '');
+      const adSoyad = (fullRow?.name || [parsed.ad, parsed.soyad].filter(Boolean).join(' ')).trim() || '-';
+
+      // Order: Kategori, Tarih, Kurum, Ad Soyad, Üye No, E‑posta, Telefon, Konu, Mesaj
+      wrap.appendChild(roInput('Kategori', catLabel, 'text'));
+      wrap.appendChild(roInput('Tarih', fullRow?.created_at ? new Date(fullRow.created_at).toLocaleString('tr-TR') : '-', 'text'));
+      wrap.appendChild(roInput('Kurum', parsed.kurum || '-', 'text'));
+      wrap.appendChild(roInput('Ad Soyad', adSoyad, 'text'));
+      wrap.appendChild(roInput('Üye No', parsed.uyeNo || '-', 'text'));
+      wrap.appendChild(roInput('E‑posta', fullRow?.email || '-', 'email'));
+      wrap.appendChild(roInput('Telefon', parsed.telefon || '-', 'tel'));
+
+      // Konu with category badge (color-coded)
+      {
+        const lbl = document.createElement('label');
+        lbl.style.display='grid';
+        lbl.style.gap='6px';
+        const bar = document.createElement('div');
+        bar.style.display='flex'; bar.style.alignItems='center'; bar.style.gap='8px';
+        const title = document.createElement('span'); title.textContent = 'Konu';
+        const badge = document.createElement('span');
+        const catKey = (cat && map[cat]) ? cat : null;
+        const catClass = catKey && ['all','contact','email','membership','lawyer','meeting'].includes(catKey) ? `badge-${catKey}` : 'badge-neutral';
+        badge.className = `badge ${catClass}`; badge.textContent = catLabel;
+        bar.appendChild(title); bar.appendChild(badge);
+        lbl.appendChild(bar);
+        const inp = document.createElement('input'); inp.type='text'; inp.value = subjClean; inp.disabled = true; lbl.appendChild(inp);
+        wrap.appendChild(lbl);
+      }
+
+      // Mesaj: only description
+      {
+        const mLbl = document.createElement('label');
+        mLbl.style.display='grid'; mLbl.style.gap='6px';
+        mLbl.innerHTML = '<span>Mesaj</span>';
+        const ta = document.createElement('textarea'); ta.rows = 12; ta.value = String(parsed.aciklama || ''); ta.disabled = true; mLbl.appendChild(ta);
+        wrap.appendChild(mLbl);
+      }
 
       try{
         const replyBody = (fullRow && (fullRow.reply_body ?? fullRow.replyBody ?? fullRow.reply_message ?? fullRow.replyMessage)) || '';
@@ -2999,6 +3196,70 @@ function openReportModal(row){
     }catch{ showLogin(); }
   }
 
+  // ============ Login reCAPTCHA (Admin) ============
+  async function initLoginRecaptcha(){
+    try{
+      const container = document.getElementById('recaptcha-login-container');
+      const btn = document.getElementById('loginSubmitBtn');
+      const fbWrap = document.getElementById('captcha-login-fallback');
+      const fbCb = document.getElementById('captchaLoginAgree');
+      if (!container || !btn) return; // no login form
+
+      const setEnabled = (v)=>{ try{ btn.disabled = !v; btn.setAttribute('aria-disabled', (!v).toString()); }catch{} };
+      // default: require verification
+      setEnabled(false);
+
+      // Fetch site key from settings
+      let siteKey = '';
+      try{ siteKey = await getSettingValue('recaptcha_site_key'); }catch{}
+
+      // Expose a small state
+      try{ window.__loginRecaptcha = window.__loginRecaptcha || { token:null, widgetId:null, siteKey:null }; }catch{}
+      try{ window.__loginRecaptcha.siteKey = siteKey || null; window.__loginRecaptcha.token = null; }catch{}
+
+      if (!siteKey){
+        // No site key: present fallback checkbox
+        if (fbWrap) fbWrap.hidden = false;
+        if (fbCb){ const onChange = ()=> setEnabled(!!fbCb.checked); fbCb.addEventListener('change', onChange); onChange(); }
+        return;
+      }
+
+      // We have siteKey: ensure fallback hidden
+      if (fbWrap) fbWrap.hidden = true;
+
+      // Load API once
+      const RENDER_CB = 'onAdminRecaptchaReady';
+      const scriptId = 'recaptcha-api';
+      function render(){
+        try{
+          if (!window.grecaptcha) return;
+          if (fbWrap) fbWrap.hidden = true;
+          const widgetId = window.grecaptcha.render('recaptcha-login-container', {
+            sitekey: siteKey,
+            callback: (token)=>{ try{ window.__loginRecaptcha.token = token; }catch{} setEnabled(!!token); },
+            'expired-callback': ()=>{ try{ window.__loginRecaptcha.token = null; }catch{} setEnabled(false); }
+          });
+          try{ window.__loginRecaptcha.widgetId = widgetId; }catch{}
+        }catch(e){ /* no-op */ }
+      }
+      if (!document.getElementById(scriptId)){
+        const s = document.createElement('script'); s.id = scriptId; s.async = true; s.defer = true;
+        s.src = `https://www.google.com/recaptcha/api.js?onload=${RENDER_CB}&render=explicit`;
+        document.head.appendChild(s);
+      }
+      window[RENDER_CB] = function(){ try{ render(); }catch{} };
+      // Safety timeout: if script fails to load, show fallback checkbox
+      setTimeout(()=>{
+        try{
+          if (!window.grecaptcha || !window.grecaptcha.render){
+            if (fbWrap) fbWrap.hidden = false;
+            if (fbCb){ const onChange = ()=> setEnabled(!!fbCb.checked); fbCb.addEventListener('change', onChange); onChange(); }
+          }
+        }catch{}
+      }, 6000);
+    }catch{}
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     if (!sb()) {
       alert('Supabase yapılandırması bulunamadı.');
@@ -3026,11 +3287,23 @@ function openReportModal(row){
         try{ passIn.setAttribute('autocapitalize','none'); passIn.setAttribute('spellcheck','false'); }catch{}
       }
     }catch{}
+    // Initialize reCAPTCHA for login form (async, with fallback)
+    try{ initLoginRecaptcha(); }catch{}
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
       const email = String(fd.get('email')|| '').trim();
       const password = String(fd.get('password')|| '').trim();
+      // Enforce captcha: either token present or fallback checkbox checked
+      try{
+        const needEnforce = !!document.getElementById('recaptcha-login-container');
+        if (needEnforce){
+          const tokenOk = !!(window.__loginRecaptcha && window.__loginRecaptcha.token);
+          const cb = document.getElementById('captchaLoginAgree');
+          const cbOk = !!(cb && cb.checked);
+          if (!tokenOk && !cbOk){ alert('Lütfen doğrulamayı tamamlayınız.'); return; }
+        }
+      }catch{}
       if (!email || !password) return;
       const submitBtn = form.querySelector('button[type="submit"]');
       if (submitBtn) submitBtn.disabled = true;
