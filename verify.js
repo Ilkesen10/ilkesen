@@ -43,18 +43,19 @@
     const full = member?.full_name || '';
     const no = member?.membership_no || '';
     const st = member?.status || '';
-    const badge = `<span class="badge ok">✔ Geçerli Üyelik</span>`;
     const meta = [no?`Üye No: ${no}`:'', st?`Durum: ${st}`:''].filter(Boolean).join(' • ');
-    const html = `
-      <div class="row">
-        <div>
-          <div id="fullName" class="name">${full}</div>
-          <div id="meta" class="muted">${meta}</div>
-          <div id="badge" style="margin-top:8px;">${badge}</div>
-        </div>
-      </div>
-    `;
-    box.innerHTML = html;
+    // Build DOM safely without innerHTML
+    box.innerHTML = '';
+    const row = document.createElement('div'); row.className = 'row';
+    const wrap = document.createElement('div');
+    const nameEl = document.createElement('div'); nameEl.id = 'fullName'; nameEl.className = 'name'; nameEl.textContent = full;
+    const metaEl = document.createElement('div'); metaEl.id = 'meta'; metaEl.className = 'muted'; metaEl.textContent = meta;
+    const badgeWrap = document.createElement('div'); badgeWrap.id = 'badge'; badgeWrap.style.marginTop = '8px';
+    const badgeSpan = document.createElement('span'); badgeSpan.className = 'badge ok'; badgeSpan.textContent = '✔ Geçerli Üyelik';
+    badgeWrap.appendChild(badgeSpan);
+    wrap.appendChild(nameEl); wrap.appendChild(metaEl); wrap.appendChild(badgeWrap);
+    row.appendChild(wrap);
+    box.appendChild(row);
   }
 
   function renderInvalid(reason){
@@ -62,7 +63,9 @@
     if (!box) return;
     const why = reason==='inactive' ? 'Üyelik pasif' : 'Geçersiz ya da eski QR';
     box.style.display='';
-    box.innerHTML = `<div class="badge bad">✖ ${why}</div>`;
+    box.innerHTML = '';
+    const el = document.createElement('div'); el.className = 'badge bad'; el.textContent = `✖ ${why}`;
+    box.appendChild(el);
   }
 
   async function run(token){

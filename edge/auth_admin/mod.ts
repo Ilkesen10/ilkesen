@@ -14,10 +14,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-if (!supabaseUrl || !serviceKey) {
-  console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables");
+const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+if (!supabaseUrl || !serviceKey || !anonKey) {
+  console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY environment variables");
 }
-const admin = createClient(supabaseUrl, serviceKey, {
+// Admin client (service role) for privileged operations
+const sbAdmin = createClient(supabaseUrl, serviceKey, {
+  auth: { persistSession: false }
+});
+// Anon client for validating Bearer tokens from callers
+const sbAnon = createClient(supabaseUrl, anonKey, {
   auth: { persistSession: false }
 });
 
@@ -34,7 +40,7 @@ async function findUserByEmail(email: string) {
   let page = 1;
   const perPage = 200;
   for (let i = 0; i < 10; i++) { // up to 2000 users scan
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    const { data, error } = await sbAdmin.auth.admin.listUsers({ page, perPage });
     if (error) throw error;
     const hit = data?.users?.find(u => (u.email || "").toLowerCase() === email.toLowerCase());
     if (hit) return hit;
@@ -51,6 +57,33 @@ serve(async (req) => {
   }
 
   try {
+    // AuthN: require Bearer token and validate user
+    const authH = req.headers.get("Authorization") || "";
+    const token = authH.startsWith("Bearer ") ? authH.slice(7) : "";
+    if (!token) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders(origin) } });
+    }
+    const { data: userData, error: userErr } = await sbAnon.auth.getUser(token);
+    if (userErr || !userData?.user?.email) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders(origin) } });
+    }
+
+    // AuthZ: only allow admin/superadmin emails found in admin_users table
+    const email = String(userData.user.email || "");
+    const { data: adminRow, error: adminErr } = await sbAdmin
+      .from("admin_users")
+      .select("roles")
+      .eq("email", email)
+      .maybeSingle();
+    if (adminErr || !adminRow) {
+      return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders(origin) } });
+    }
+    const roles = Array.isArray((adminRow as any).roles) ? (adminRow as any).roles.map((r: any) => String(r).toLowerCase()) : [];
+    const allowed = roles.includes("superadmin") || roles.includes("admin");
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders(origin) } });
+    }
+
     const body = await req.json().catch(() => ({}));
     const action = body?.action;
 
@@ -65,7 +98,7 @@ serve(async (req) => {
     }
 
     // Try create user first
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    const { data: created, error: createErr } = await sbAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
@@ -79,7 +112,7 @@ serve(async (req) => {
     if (!existing) {
       return new Response(JSON.stringify({ error: createErr?.message || "user_not_found" }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders(origin) } });
     }
-    const { data: updated, error: updErr } = await admin.auth.admin.updateUserById(existing.id, { password });
+    const { data: updated, error: updErr } = await sbAdmin.auth.admin.updateUserById(existing.id, { password });
     if (updErr) {
       return new Response(JSON.stringify({ error: updErr.message }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders(origin) } });
     }

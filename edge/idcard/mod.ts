@@ -38,6 +38,23 @@ function formatPhone(e164?: string) {
   return `+90 ${p.slice(0,3)} ${p.slice(3,6)} ${p.slice(6,8)} ${p.slice(8,10)}`;
 }
 
+function slugifyNameForFile(input: string): string {
+  try{
+    let base = String(input || '').trim();
+    if (!base) return 'uye';
+    base = base.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    base = base
+      .replace(/ı/g,'i').replace(/İ/g,'I')
+      .replace(/ş/g,'s').replace(/Ş/g,'S')
+      .replace(/ğ/g,'g').replace(/Ğ/g,'G')
+      .replace(/ç/g,'c').replace(/Ç/g,'C')
+      .replace(/ö/g,'o').replace(/Ö/g,'O')
+      .replace(/ü/g,'u').replace(/Ü/g,'U');
+    base = base.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+    return base || 'uye';
+  }catch{ return 'uye'; }
+}
+
 function renderHtmlCard(member: any) {
   const fullName = `${member.first_name ?? ''} ${member.last_name ?? ''}`.trim();
   const maskedTc = maskTc(member.national_id);
@@ -53,25 +70,25 @@ function renderHtmlCard(member: any) {
   // Simple email-safe HTML with an optional background image
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;color:#0f172a;max-width:520px;margin:0 auto">
-    <div style="text-align:center;margin-bottom:16px">
-      <h1 style="font-size:36px;font-weight:bold;margin:0 0 4px;color:#1e40af;letter-spacing:1px">İLKE-SEN</h1>
-      <div style="font-size:12px;color:#4b5563;margin-bottom:8px">İLKELİ YEREL YÖNETİM HİZMETLERİ KOLU KAMU GÖREVLİLERİ SENDİKASI</div>
+    <div style="text-align:center;margin-bottom:16px;background:#0B3A60;padding:12px 8px;border-radius:10px">
+      <h1 style="font-size:36px;font-weight:bold;margin:0 0 4px;color:#ffffff;letter-spacing:1px">İLKE-SEN</h1>
+      <div style="font-size:12px;color:#E03B3B;margin-bottom:8px">İLKELİ YEREL YÖNETİM HİZMETLERİ KOLU KAMU GÖREVLİLERİ SENDİKASI</div>
       <img src="https://www.ilke-sen.org.tr/ilke-sen-logo.png" alt="İLKE-SEN Logo" style="max-width:250px;height:auto">
     </div>
     <div style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;max-width:100%">
       ${IDCARD_BG_URL ? `<div style=\"background:url('${IDCARD_BG_URL}') center/cover no-repeat;\">` : '<div>'}
-        <div style="display:flex;gap:12px;padding:16px;background:rgba(255,255,255,0.94)">
-          <div style="flex:0 0 96px;height:96px;border-radius:10px;overflow:hidden;background:#f1f5f9;border:1px solid #e5e7eb">
+        <div style="display:flex;gap:16px;padding:16px;background:rgba(255,255,255,0.94);align-items:center">
+          <div style="flex:0 0 120px;height:120px;border-radius:9999px;overflow:hidden;background:#f1f5f9;border:4px solid #0B3A60;box-shadow:0 0 0 4px #E03B3B">
             ${photo ? `<img src="${photo}" alt="" style="width:100%;height:100%;object-fit:cover"/>` : ''}
           </div>
           <div style="flex:1;display:flex;flex-direction:column;gap:6px">
-            <div><strong>Ad Soyad:</strong> ${fullName}</div>
-            <div><strong>Üye No:</strong> ${memberNo}</div>
-            <div><strong>TC:</strong> ${maskedTc}</div>
-            <div><strong>Unvan/Kurum:</strong> ${title} ${institution ? ' • ' + institution : ''}</div>
-            <div><strong>Kan Grubu:</strong> ${blood}</div>
-            <div><strong>Kayıt Tarihi:</strong> ${joinDate}</div>
-            <div><strong>İletişim:</strong> ${email} ${phone ? ' • ' + phone : ''}</div>
+            <div style="font-size:20px;font-weight:800;color:#0B3A60;letter-spacing:0.5px;text-transform:uppercase">${fullName}</div>
+            ${title ? `<div style=\"font-size:16px;font-weight:700;color:#E03B3B;text-transform:uppercase\">${title}</div>` : ''}
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+              <div><span style="color:#E03B3B;font-weight:700;display:inline-block;min-width:140px">Üye Numarası</span><span style="color:#0B3A60;font-weight:700">: ${memberNo}</span></div>
+              <div><span style="color:#E03B3B;font-weight:700;display:inline-block;min-width:140px">Üyelik Tarihi</span><span style="color:#0B3A60;font-weight:700">: ${joinDate}</span></div>
+              <div><span style="color:#E03B3B;font-weight:700;display:inline-block;min-width:140px">TC. No</span><span style="color:#0B3A60;font-weight:700">: ${maskedTc}</span></div>
+            </div>
           </div>
         </div>
       </div>
@@ -105,7 +122,7 @@ async function sendEmail(to: string, subject: string, html: string, attachment?:
   }
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   const origin = req.headers.get("Origin") || "*";
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders(origin) });
@@ -129,7 +146,9 @@ serve(async (req) => {
           let ext = 'jpg';
           if (meta.includes('png')) ext = 'png';
           const base64 = dataUrl.substring(comma + 1);
-          const fname = `kimlik_${m.member_no || m.id || 'uye'}.${ext}`;
+          const fullName = `${m.first_name ?? ''} ${m.last_name ?? ''}`.trim();
+          const base = slugifyNameForFile(fullName || String(m.member_no || m.id || 'uye'));
+          const fname = `kimlik_${base}.${ext}`;
           attachment = { filename: fname, content: base64 };
         }
       }
@@ -140,6 +159,7 @@ serve(async (req) => {
     await sendEmail(m.email, "Dijital Üyelik Kimliği", html, attachment);
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders(origin) } });
   } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: String(e?.message ?? e) }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders(origin) } });
+    const msg = e instanceof Error ? e.message : String(e);
+    return new Response(JSON.stringify({ ok: false, error: msg }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders(origin) } });
   }
 });

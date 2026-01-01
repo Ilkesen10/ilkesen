@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" id="csp-meta" content="default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; img-src 'self' data: https://www.google.com https://www.gstatic.com https://*.supabase.co blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-src https://www.google.com https://www.gstatic.com; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" id="csp-meta" content="default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; img-src 'self' data: https://www.google.com https://www.gstatic.com https://*.supabase.co blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-src https://www.google.com https://www.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" />
   <script>
     (function(){
       try{
@@ -11,18 +11,20 @@
         if (!isLocal) return;
         var m = document.getElementById('csp-meta');
         if (!m) return;
-        var relaxed = "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://www.gstatic.com; img-src 'self' data: https://www.google.com https://www.gstatic.com https://*.supabase.co blob:; font-src 'self' data:; connect-src *; frame-src https://www.google.com https://www.gstatic.com; base-uri 'self'; form-action 'self'";
+        var relaxed = "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://www.gstatic.com; img-src 'self' data: https://www.google.com https://www.gstatic.com https://*.supabase.co blob:; font-src 'self' data:; connect-src *; frame-src https://www.google.com https://www.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
         m.setAttribute('content', relaxed);
       }catch(e){}
     })();
   </script>
   <title>Haber | İlke Sendika</title>
-  <meta name="theme-color" content="#0f766e" />
+  <meta name="theme-color" content="#0B3A60" />
   <meta name="description" content="Haber detay sayfası" />
   <link rel="icon" href="ilkesen.jpg" type="image/jpeg" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20251227-01" />
   <script src="vendor/supabase/supabase.js"></script>
   <script src="supabase-config.js"></script>
+  <script src="safe-images.js"></script>
+  <script defer src="safe-images-dom.js"></script>
   <script defer src="app.js?v=20251205-02"></script>
   <script defer src="news.js?v=20251205-02"></script>
   <style>
@@ -37,7 +39,7 @@
     .viewer .next{right:10px}
     .thumbs{display:flex;gap:8px;overflow:auto;padding-bottom:4px}
     .thumbs img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:2px solid transparent;cursor:pointer;flex:0 0 auto}
-    .thumbs img.active{border-color:#0d9488}
+    .thumbs img.active{border-color:var(--brand-600)}
   </style>
 </head>
 <body>
@@ -48,8 +50,8 @@
     <div class="container header-inner">
       <div class="brand">
         <a href="index.html" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:inherit">
-          <img id="headerLogo" src="ilkesen.jpg" alt="İlke Sendika Logosu" class="logo" />
-          <span class="brand-name">İlke Sendika</span>
+          <img id="headerLogo" src="ilke-logo.png" alt="İLKE SEN Logosu" class="logo" />
+          <span class="brand-name">İLKE <span class="brand-sen">SEN</span></span>
         </a>
       </div>
       <nav class="nav" aria-label="Ana menü">
@@ -117,8 +119,8 @@
   <footer class="site-footer">
     <div class="container footer-inner">
       <div class="brand">
-        <img id="footerLogo" src="ilkesen.jpg" alt="İlke Sendika Logosu" class="logo" />
-        <span class="brand-name">İlke Sendika</span>
+        <img id="footerLogo" src="ilke-logo.png" alt="İLKE SEN Logosu" class="logo" />
+        <span class="brand-name">İLKE <span class="brand-sen">SEN</span></span>
       </div>
       <div class="footer-columns">
         <div class="footer-col">

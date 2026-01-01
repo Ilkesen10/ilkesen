@@ -37,9 +37,20 @@
       const lbPrev = qs('#lbPrev');
       const lbNext = qs('#lbNext');
       const lbClose = qs('#lbClose');
-      // helpers: strip crop meta and cache-bust url
+      // helpers: strip crop meta and cache-bust url (skip blob:/data:)
       const stripMeta = (u)=>{ if(!u) return ''; const s=String(u); const i=s.indexOf('|'); return i>=0 ? s.slice(0,i) : s; };
-      const bust = (u)=>{ try{ const x=new URL(stripMeta(u), location.origin); x.searchParams.set('v', Date.now()); return x.toString(); }catch{ return stripMeta(u); } };
+      const bust = (u)=>{ try{ if (!u) return ''; if (/^(?:blob:|data:)/i.test(u)) return u; const x=new URL(stripMeta(u), location.origin); x.searchParams.set('v', Date.now()); return x.toString(); }catch{ return stripMeta(u); } };
+      const setImgSrc = (img, url)=>{
+        try{
+          const base = stripMeta(url||'');
+          if (!img) return;
+          if (window.safeImageUrl && /^https?:/i.test(base)){
+            window.safeImageUrl(base).then(su => { img.src = bust(su || base); }).catch(()=>{ img.src = bust(base); });
+          } else {
+            img.src = bust(base);
+          }
+        }catch{ if (img) img.src = stripMeta(url||''); }
+      };
       if (galRoot && mainImg && thumbs){
         let gallery = [];
         try{
@@ -63,7 +74,7 @@
         function show(i){
           if (!ordered.length) { mainImg.hidden = true; thumbs.innerHTML=''; return; }
           idx = (i + ordered.length) % ordered.length;
-          mainImg.src = bust(ordered[idx]);
+          setImgSrc(mainImg, ordered[idx]);
           mainImg.alt = data.title || 'Haber görseli';
           mainImg.hidden = false;
           Array.from(thumbs.querySelectorAll('img')).forEach((t, ti)=>{
@@ -75,13 +86,13 @@
             nextBtn.style.display = one ? 'none' : '';
           }
           // Keep lightbox image in sync if open
-          if (lb && lb.style.display === 'flex' && lbImg){ lbImg.src = bust(ordered[idx]); lbImg.alt = mainImg.alt; }
+          if (lb && lb.style.display === 'flex' && lbImg){ setImgSrc(lbImg, ordered[idx]); lbImg.alt = mainImg.alt; }
         }
         function renderThumbs(){
           thumbs.innerHTML = '';
           ordered.forEach((u, ti)=>{
             const t = document.createElement('img');
-            t.src = bust(u); t.alt = '';
+            setImgSrc(t, u); t.alt = '';
             if (ti === idx) t.classList.add('active');
             t.addEventListener('click', ()=> show(ti));
             thumbs.appendChild(t);
@@ -100,7 +111,7 @@
         document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopAutoplay(); else startAutoplay(); });
 
         // Lightbox open on main image click
-        function openLightbox(){ if (!lb || !lbImg) return; stopAutoplay(); lb.style.display = 'flex'; lbImg.src = bust(ordered[idx]); lbImg.alt = mainImg.alt; }
+        function openLightbox(){ if (!lb || !lbImg) return; stopAutoplay(); lb.style.display = 'flex'; setImgSrc(lbImg, ordered[idx]); lbImg.alt = mainImg.alt; }
         function closeLightbox(){ if (!lb) return; lb.style.display = 'none'; startAutoplay(); }
         mainImg.addEventListener('click', openLightbox);
         if (lbPrev) lbPrev.onclick = ()=> show(idx - 1);

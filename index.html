@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" id="csp-meta" content="default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-src https://www.google.com https://www.gstatic.com; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" id="csp-meta" content="default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-src https://www.google.com https://www.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" />
   <script>
     (function(){
       try{
@@ -11,27 +11,37 @@
         if (!isLocal) return;
         var m = document.getElementById('csp-meta');
         if (!m) return;
-        var relaxed = "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src *; frame-src https://www.google.com https://www.gstatic.com; base-uri 'self'; form-action 'self'";
+        var relaxed = "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src *; frame-src https://www.google.com https://www.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
         m.setAttribute('content', relaxed);
       }catch(e){}
     })();
   </script>
   <title>İlke Sendika</title>
   <meta name="description" content="İlke Sendika - Hak, adalet ve dayanışma için bir arada." />
-  <meta name="theme-color" content="#0f766e" />
+  <meta name="theme-color" content="#0B3A60" />
   <meta property="og:title" content="İlke Sendika" />
   <meta property="og:description" content="Hak, adalet ve dayanışma için bir arada." />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="ilkesen.jpg" />
 
   <link rel="icon" href="ilkesen.jpg" type="image/jpeg" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20251227-02" />
   <!-- Handwriting font for banner motto -->
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet" />
   <!-- Self-hosted Supabase client (UMD) -->
   <script src="vendor/supabase/supabase.js"></script>
   <!-- Project Supabase config -->
   <script src="supabase-config.js"></script>
+  <!-- Safe Images config (temporary: wrap all cross-origin for diagnostics) -->
+  <script>
+    // Set to true to wrap any cross-origin http(s) image via fetch->blob: (prevents third‑party cookies)
+    window.__SAFE_IMG_WRAP_ALL = true;
+    // Optional: restrict to specific hosts in addition to Supabase (kept minimal)
+    window.__SAFE_IMG_HOSTS = ['supabase.co'];
+  </script>
+  <!-- Safe image shims (prevent Cloudflare cookie noise) -->
+  <script src="safe-images.js"></script>
+  <script defer src="safe-images-dom.js"></script>
   <!-- Initialize shared UI behaviors (cache-busted) -->
   <script defer src="app.js?v=20251205-01"></script>
   <script>
@@ -66,7 +76,7 @@
             if (error) throw error;
             const map = new Map((data||[]).map(r => [r.key, r.value]));
             const buster = (url)=>{ try{ const u=new URL(url, location.origin); u.searchParams.set('v',Date.now()); return u.toString(); }catch{return url;} };
-            const logoUrl = map.get('footer_logo_url') || 'ilkesen.jpg';
+            const logoUrl = map.get('footer_logo_url') || 'ilke-logo.png';
             const footerLogo = document.getElementById('footerLogo'); if (footerLogo && logoUrl) footerLogo.src = buster(logoUrl);
             const headerLogo = document.getElementById('headerLogo'); if (headerLogo && logoUrl) headerLogo.src = buster(logoUrl);
             const addrEl = document.getElementById('footerAddress');
@@ -256,26 +266,14 @@ holder.appendChild(bg);
 <body>
   <a class="skip-link" href="#main">İçeriğe geç</a>
   
-  <!-- Top Banner (restored) -->
-  <div class="top-banner" style="background:linear-gradient(90deg,#5ed1e2,#3ec1d3);color:#fff;">
-    <div class="container" style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;">
-      <div class="banner-left" style="display:flex;align-items:center;gap:10px;min-width:160px;">
-        <img src="Turk_Bayrak.gif" alt="Türk Bayrağı" style="height:72px;width:auto;object-fit:cover;border-radius:6px;box-shadow:0 6px 16px rgba(0,0,0,.15)" />
-      </div>
-      <div class="banner-center" style="text-align:center;flex:1;font-weight:700;letter-spacing:.2px;font-size:clamp(18px,3.2vw,28px);line-height:1.15;font-family:'Caveat',cursive;">
-        İlkeli Sendika: Adalet, Şeffaflık, Dayanışma.
-      </div>
-      <div class="banner-right" style="display:flex;align-items:center;gap:10px;min-width:160px;justify-content:flex-end">
-        <img src="ilkesen.jpg" alt="İlke Sendika Logosu" style="height:72px;width:72px;object-fit:cover;border-radius:50%;background:#fff;padding:6px;box-shadow:0 6px 16px rgba(0,0,0,.15);border:2px solid rgba(255,255,255,.85)" />
-      </div>
-    </div>
-  </div>
+  <!-- Hero (mockup-based) -->
+  
   
   <header class="site-header">
     <div class="container header-inner">
       <div class="brand">
-        <img id="headerLogo" src="ilkesen.jpg" alt="İlke Sendika Logosu" class="logo" />
-        <span class="brand-name">İlke Sendika</span>
+        <img id="headerLogo" src="ilke-logo.png" alt="İLKE SEN Logosu" class="logo" />
+        <span class="brand-name">İLKE <span class="brand-sen">SEN</span></span>
       </div>
       <nav class="nav" aria-label="Ana menü">
         <button class="nav-toggle" aria-expanded="false" aria-controls="navMenu" aria-label="Menüyü aç/kapat">☰</button>
@@ -304,15 +302,45 @@ holder.appendChild(bg);
           <li><a href="page.html?slug=kanun">4688 Sayılı Kanun</a></li>
       </ul>
       </li>
+    <li><a href="page.html?slug=uyelere-ozel">Üyelere Özel</a></li>
     <li><a href="contact.html">İletişim</a></li>
         </ul>
       </nav>
     </div>
   </header>
 
+  <!-- HERO -->
+  <section class="hero hero-brand">
+    <div class="container">
+      <h1>İLKEYLE BİRLİK,<br/>GÜÇLE GELECEK</h1>
+    </div>
+  </section>
+
   <main id="main">
+    
+    
+    <!-- Faaliyetlerimiz -->
+    <section class="section home-features wave-section wave-bottom" aria-label="Faaliyetlerimiz">
+      <div class="container home-cards">
+        <article class="card feature-card">
+          <img src="icons/people.svg" alt="Toplantı" width="64" height="64" style="margin:auto" onerror="this.remove()" />
+          <h3>Temsil ve Destek</h3>
+          <p>Üyelerimizin haklarını kurumsal ve hukuki düzlemde temsil ederiz.</p>
+        </article>
+        <article class="card feature-card">
+          <img src="icons/megaphone.svg" alt="Duyuru" width="64" height="64" style="margin:auto" onerror="this.remove()" />
+          <h3>Eğitim ve İletişim</h3>
+          <p>Bilgilendirici etkinlikler ve yayınlarla güçlü iletişim kurarız.</p>
+        </article>
+        <article class="card feature-card">
+          <img src="icons/law.svg" alt="Hukuk" width="64" height="64" style="margin:auto" onerror="this.remove()" />
+          <h3>Hukuki Danışmanlık</h3>
+          <p>Uzman avukatlarımızla ücretsiz danışmanlık sağlar, süreçleri takip ederiz.</p>
+        </article>
+      </div>
+    </section>
     <!-- Slider (Haberler) moved to top -->
-    <section class="section slider-wrap" aria-label="Haberler Slider">
+    <section class="section slider-wrap wave-section wave-top" aria-label="Haberler Slider">
       <div class="container">
         <div class="slider" data-slider>
           <button class="slider-btn prev" aria-label="Önceki" data-prev>‹</button>
@@ -323,27 +351,31 @@ holder.appendChild(bg);
     </section>
 
     <!-- Hakkımızda moved under banner -->
-    <section id="hakkimizda" class="section">
-      <div class="container grid two">
-        <div>
-          <h2>Hakkımızda</h2>
-          <p>
-            İlke Sendika; adalet, şeffaflık ve dayanışma ilkelerini merkeze alarak çalışanların yanında durur. 
-            Çalışma hayatında onurlu bir gelecek için örgütlü mücadelenin gücüne inanıyoruz.
-          </p>
-          <ul class="checks">
-            <li>Güçlü temsil ve savunuculuk</li>
-            <li>Şeffaf yönetim ve hesap verebilirlik</li>
-            <li>Eğitim, danışmanlık ve destek</li>
-          </ul>
-        </div>
-        <div>
-          <h3>Önemli Günler</h3>
-          <section id="homePosters" class="home-posters" aria-label="Önemli Günler">
-            <div class="hp-track" data-hp-track></div>
-            <button class="hp-nav hp-prev" data-hp-prev aria-label="Önceki">‹</button>
-            <button class="hp-nav hp-next" data-hp-next aria-label="Sonraki">›</button>
-          </section>
+    <section id="hakkimizda" class="section wave-section wave-bottom">
+      <div class="container">
+        <div class="card">
+          <div class="grid two">
+            <div>
+              <h2>Hakkımızda</h2>
+              <p>
+                İlke Sendika; adalet, şeffaflık ve dayanışma ilkelerini merkeze alarak çalışanların yanında durur. 
+                Çalışma hayatında onurlu bir gelecek için örgütlü mücadelenin gücüne inanıyoruz.
+              </p>
+              <ul class="checks">
+                <li>Güçlü temsil ve savunuculuk</li>
+                <li>Şeffaf yönetim ve hesap verebilirlik</li>
+                <li>Eğitim, danışmanlık ve destek</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Önemli Günler</h3>
+              <section id="homePosters" class="home-posters" aria-label="Önemli Günler">
+                <div class="hp-track" data-hp-track></div>
+                <button class="hp-nav hp-prev" data-hp-prev aria-label="Önceki">‹</button>
+                <button class="hp-nav hp-next" data-hp-next aria-label="Sonraki">›</button>
+              </section>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -351,14 +383,16 @@ holder.appendChild(bg);
     
 
     <!-- Duyurular -->
-    <section id="duyurular" class="section section-muted">
+    <section id="duyurular" class="section wave-section wave-top">
       <div class="container">
         <h2>Duyurular</h2>
-        <ul class="announcements" id="announcementsList">
+        <div class="card">
+          <ul class="announcements" id="announcementsList">
           <li><strong>Genel Kurul:</strong> 12 Aralık 2025 tarihinde genel kurul yapılacaktır.</li>
           <li><strong>Üyelik Aidatları:</strong> Yeni dönem aidatları ve ödeme kanalları güncellendi.</li>
           <li><strong>Temsilci Başvuruları:</strong> Bölge temsilciliği için başvurular açıldı.</li>
-        </ul>
+          </ul>
+        </div>
       </div>
     </section>
     
@@ -389,10 +423,28 @@ holder.appendChild(bg);
       </div>
     </section>
 
-    <section id="haberler" class="section section-muted">
+    <section id="haberler" class="section wave-section wave-bottom">
       <div class="container">
         <h2>Haberler</h2>
         <div id="newsCards" class="grid three cards" role="list"></div>
+      </div>
+    </section>
+
+    <!-- CTA Cards: Avukatlık Talebi / Görüşme Talebi / Üyelik Başvurusu -->
+    <section class="section cta-section" aria-label="Hızlı İşlemler">
+      <div class="container home-cards">
+        <a class="card cta-card" href="avukatlik-talebi.html">
+          <img src="icons/gavel.png" alt="Avukatlık Talebi" width="64" height="64" onerror="this.remove()" />
+          <h3>Avukatlık Talebi</h3>
+        </a>
+        <a class="card cta-card" href="gorusme-talebi.html">
+          <img src="icons/meeting.png" alt="Görüşme Talebi" width="64" height="64" onerror="this.remove()" />
+          <h3>Görüşme Talebi</h3>
+        </a>
+        <a class="card cta-card" href="uyelik-basvurusu.html">
+          <img src="icons/application.png" alt="Üyelik Başvurusu" width="64" height="64" onerror="this.remove()" />
+          <h3>Üyelik Başvurusu</h3>
+        </a>
       </div>
     </section>
 
@@ -402,8 +454,8 @@ holder.appendChild(bg);
   <footer class="site-footer">
     <div class="container footer-inner">
       <div class="brand">
-        <img id="footerLogo" src="ilkesen.jpg" alt="İlke Sendika Logosu" class="logo" />
-        <span class="brand-name">İlke Sendika</span>
+        <img id="footerLogo" src="ilke-logo.png" alt="İlke Sendika Logosu" class="logo" />
+        <span class="brand-name">İLKE <span class="brand-sen">SEN</span></span>
       </div>
       <div class="footer-columns">
         <div class="footer-col">

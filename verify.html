@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" id="csp-meta" content="default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-src https://www.google.com https://www.gstatic.com; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" id="csp-meta" content="default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-src https://www.google.com https://www.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" />
   <title>Üyelik Doğrulama | İlke Sendika</title>
   <meta name="description" content="Üye doğrulama" />
   <link rel="icon" href="ilkesen.jpg" type="image/jpeg" />
@@ -26,7 +26,34 @@
             const token = urlParams.get('t');
             const statusEl = document.getElementById('verifyStatus');
             const resultEl = document.getElementById('verifyResult');
-        
+
+            function setResultVerified(member){
+              const m = member || {};
+              const trStatus = (s)=>{ const v=String(s||'').toLowerCase(); if(v==='active') return 'aktif'; if(v==='passive') return 'pasif'; return v||'-'; };
+              resultEl.innerHTML = '';
+              const items = [
+                ['Ad Soyad:', m.full_name || '-'],
+                ['Üye No:', m.membership_no || '-'],
+                ['Durum:', trStatus(m.status)],
+                ['Üyelik Tarihi:', m.join_date ? new Date(m.join_date).toLocaleDateString('tr-TR') : '-']
+              ];
+              for (const [label, value] of items){
+                const row = document.createElement('div');
+                const strong = document.createElement('strong'); strong.textContent = label + ' ';
+                const span = document.createElement('span'); span.textContent = value;
+                row.appendChild(strong); row.appendChild(span);
+                resultEl.appendChild(row);
+              }
+            }
+
+            function setResultError(msg){
+              resultEl.innerHTML = '';
+              const div = document.createElement('div');
+              div.className = 'text-danger';
+              div.textContent = msg;
+              resultEl.appendChild(div);
+            }
+
             try{
               if (!window.ilkeSupabase) {
                 statusEl.innerText = 'Sunucu yapılandırması eksik';
@@ -49,20 +76,13 @@
                   statusEl.style.color = '#16a34a';
                   statusEl.style.fontWeight = '700';
                   statusEl.style.fontSize = '20px';
-                  const m = data.member || {};
-                  const trStatus = (s)=>{ const v=String(s||'').toLowerCase(); if(v==='active') return 'aktif'; if(v==='passive') return 'pasif'; return v||'-'; };
-                  resultEl.innerHTML = `
-                    <div><strong>Ad Soyad:</strong> ${m.full_name || '-'}</div>
-                    <div><strong>Üye No:</strong> ${m.membership_no || '-'}</div>
-                    <div><strong>Durum:</strong> ${trStatus(m.status)}</div>
-                    <div><strong>Üyelik Tarihi:</strong> ${m.join_date ? new Date(m.join_date).toLocaleDateString('tr-TR') : '-'}</div>
-                  `;
+                  setResultVerified(data.member || {});
                 } else {
                   statusEl.innerText = 'Doğrulanamadı';
                   statusEl.style.color = '#dc2626';
                   statusEl.style.fontWeight = '800';
                   statusEl.style.fontSize = '22px';
-                  resultEl.innerHTML = `<div class="text-danger">✖ Geçersiz ya da eski QR</div>`;
+                  setResultError('✖ Geçersiz ya da eski QR');
                 }
               } else {
                 statusEl.innerText = 'Doğrulama kodu gerekli';
