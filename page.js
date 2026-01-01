@@ -165,8 +165,21 @@
     });
     return { url: base, meta };
   }
-  const params = new URLSearchParams(window.location.search);
-  const slug = (params.get('slug')||'').trim().toLowerCase();
+  function getSlug(){
+    try{
+      const sp = new URLSearchParams(window.location.search);
+      const q = (sp.get('slug')||'').trim();
+      if (q) return q.toLowerCase();
+      const parts = location.pathname
+        .replace(/\/+$/,'')
+        .split('/')
+        .filter(Boolean);
+      if (parts[0] === 'page' && parts[1]) return parts[1].toLowerCase();
+      if (parts.length === 1) return parts[0].toLowerCase();
+    }catch{}
+    return '';
+  }
+  const slug = getSlug();
 
   function ensureLawStyles(){
     if (document.getElementById('law4688Styles')) return;

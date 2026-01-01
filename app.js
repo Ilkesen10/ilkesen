@@ -575,15 +575,19 @@ window.IlkeSendika = (function(){
         const submenu = (homeLi.querySelector('.submenu') || Array.from(homeLi.children).find(c=>c.classList && c.classList.contains('submenu')));
         if (submenu){
           const lis = Array.from(submenu.children).filter(n => n.tagName === 'LI');
-          const hasAmac = submenu.querySelector('a[href*="slug=amac"]');
+          const anchors = Array.from(submenu.querySelectorAll('a'));
+          const hasAmac = anchors.some(a=>{
+            const h=(a.getAttribute('href')||'').toLowerCase();
+            return /slug=amac/.test(h) || /\/(?:page\/)?amac(?:[\/#?]|$)/.test(h);
+          });
           const misyonLi = lis.find(li => {
-            const a = li.querySelector('a');
-            return a && /slug=misyon/i.test(a.getAttribute('href')||'');
+            const a = li.querySelector('a'); const h=(a && a.getAttribute('href')||'').toLowerCase();
+            return /slug=misyon/.test(h) || /\/(?:page\/)?misyon(?:[\/#?]|$)/.test(h);
           });
           if (!hasAmac){
             // Create Amaç item
             const li = document.createElement('li');
-            const a = document.createElement('a'); a.href = 'page.html?slug=amac'; a.textContent = 'Amaç';
+            const a = document.createElement('a'); a.href = '/amac'; a.textContent = 'Amaç';
             li.appendChild(a);
             if (misyonLi && misyonLi.nextSibling){
               submenu.insertBefore(li, misyonLi.nextSibling);
@@ -603,8 +607,8 @@ window.IlkeSendika = (function(){
         const submenu = (corpLi.querySelector('.submenu') || Array.from(corpLi.children).find(c=>c.classList && c.classList.contains('submenu')));
         if (submenu){
           const gbLi = Array.from(submenu.children).find(li => {
-            const a = li.querySelector('a');
-            return a && /slug=genel-baskan/i.test(a.getAttribute('href')||'');
+            const a = li.querySelector('a'); const h=(a && a.getAttribute('href')||'').toLowerCase();
+            return /slug=genel-baskan/.test(h) || /\/(?:page\/)?genel-baskan(?:[\/#?]|$)/.test(h);
           });
           if (gbLi && submenu.firstElementChild !== gbLi){
             submenu.insertBefore(gbLi, submenu.firstElementChild);
@@ -1000,9 +1004,32 @@ try{
     window.addEventListener('scroll', onScroll, { passive: true });
   }
 
+  function devPatchPrettyLinks(){
+    try{
+      const isLocal = /^(localhost|127\.0\.0\.1)$/i.test(location.hostname);
+      if (!isLocal) return;
+      const re = /^\/(?:page\/)?([a-z0-9-]+)(?:\/?|[?#].*)$/i;
+      document.addEventListener('click', (ev)=>{
+        const t = ev.target && ev.target.closest ? ev.target.closest('a') : null;
+        if (!t) return;
+        const href = t.getAttribute('href') || '';
+        if (!href || href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('#')) return;
+        const url = new URL(href, location.origin);
+        if (url.origin !== location.origin) return;
+        const m = url.pathname.match(re);
+        if (!m) return;
+        ev.preventDefault();
+        const slug = m[1].toLowerCase();
+        const v = '20260101-02';
+        location.href = `page.html?v=${v}&slug=${encodeURIComponent(slug)}`;
+      }, true);
+    }catch{}
+  }
+
   function init(){
     initNav();
     ensureMenuStructure();
+    devPatchPrettyLinks();
     initSlider();
     initYear();
     initPolicyModal();

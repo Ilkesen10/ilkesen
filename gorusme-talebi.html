@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" id="csp-meta" content="default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://www.gstatic.com; img-src 'self' data: https://www.google.com https://www.gstatic.com https://*.supabase.co blob:; font-src 'self' data:; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-src https://www.google.com https://www.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" id="csp-meta" content="default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://www.gstatic.com; img-src 'self' data: https://www.google.com https://www.gstatic.com https://*.supabase.co blob:; font-src 'self' data:; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-src https://www.google.com https://www.gstatic.com; base-uri 'self'; form-action 'self'" />
   <script>
     (function(){
       try{
@@ -11,7 +11,7 @@
         if (!isLocal) return;
         var m = document.getElementById('csp-meta');
         if (!m) return;
-        var relaxed = "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://www.gstatic.com; img-src 'self' data: https://www.google.com https://www.gstatic.com https://*.supabase.co blob:; font-src 'self' data:; connect-src *; frame-src https://www.google.com https://www.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+        var relaxed = "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://www.gstatic.com; img-src 'self' data: https://www.google.com https://www.gstatic.com https://*.supabase.co blob:; font-src 'self' data:; connect-src *; frame-src https://www.google.com https://www.gstatic.com; base-uri 'self'; form-action 'self'";
         m.setAttribute('content', relaxed);
       }catch(e){}
     })();
