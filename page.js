@@ -7,6 +7,147 @@
     const i = s.indexOf('|');
     return i >= 0 ? s.slice(0, i) : s;
   }
+
+  // Render Üyelere Özel: 3-column responsive carousel cards
+  async function renderBenefits(){
+    try{
+      document.title = 'Üyelere Özel | İlke Sendika';
+      qs('#pageTitle').textContent = 'Üyelere Özel İndirimler';
+      const metaEl = qs('#pageMeta'); if (metaEl) metaEl.hidden = true;
+
+      // Ensure styles once
+      if (!document.getElementById('benefitsStyles')){
+        const st = document.createElement('style'); st.id='benefitsStyles'; st.textContent = `
+          #pageBody.benefits{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; align-items:stretch; }
+          @media (max-width: 980px){ #pageBody.benefits{ grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+          @media (max-width: 640px){ #pageBody.benefits{ grid-template-columns:1fr; } }
+          .benefits-wrap{ display:contents; }
+          .benefits-track{ display:contents; }
+          .benefit-card{ box-sizing:border-box; padding:12px; }
+          .benefit-card .card{ height:100%; display:grid; grid-template-rows:auto auto 1fr auto; gap:12px; padding:0; border-radius:12px; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.06); overflow:hidden; }
+          .benefit-logo{ position:relative; display:flex; align-items:center; justify-content:center; height:140px; background:#fff; overflow:hidden; }
+          .benefit-logo img{ max-width:100%; max-height:100%; object-fit:contain; display:block; }
+          .benefit-divider{ height:1px; background:#eef2f7; }
+          .benefit-name{ font-size:16px; font-weight:800; text-align:center; padding:10px 14px 0; letter-spacing:.2px; text-transform:uppercase; color:#1f2937; }
+          .benefit-badge{ background:#E03B3B; color:#fff; font-weight:800; letter-spacing:.1px; }
+          .benefit-logo .benefit-badge{ position:absolute; right:6px; bottom:6px; width:56px; height:56px; padding:6px; border-radius:50%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:1.05; font-size:12px; box-shadow:0 2px 8px rgba(0,0,0,.25); border:2px solid #fff; }
+          @media (max-width: 600px){ .benefit-logo .benefit-badge{ width:48px; height:48px; font-size:11px; } }
+          .benefit-meta{ display:grid; gap:8px; padding:0 14px 6px; }
+          .meta-row{ display:grid; grid-template-columns:36px 1fr; align-items:center; gap:8px; padding:8px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; }
+          .meta-icon{ display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:9999px; background:#fff; border:1px solid #e5e7eb; }
+          .meta-icon svg{ width:18px; height:18px; stroke:#0B3A60; stroke-width:2; fill:none; }
+          .meta-text{ font-size:14px; color:#374151; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+          .benefit-actions{ display:flex; gap:10px; justify-content:center; padding:6px 14px 14px; }
+          .benefit-actions .btn{ padding:8px 14px; }
+          .benefit-actions .btn-primary{ background:#0B3A60; border-color:#0B3A60; }
+          .benefit-actions .btn-outline{ border-color:#0B3A60; color:#0B3A60; background:#fff; }
+          .btn-pill{ border-radius:9999px; }
+          @media (max-width: 980px){ .benefit-logo{ height:120px; } }
+          @media (max-width: 640px){ .benefit-logo{ height:100px; } }
+        `; document.head.appendChild(st);
+      }
+
+      const { data, error } = await window.ilkeSupabase
+        .from('benefits')
+        .select('name, discount_text, contact, website, phone, address, logo_url, status, sort')
+        .eq('status','published')
+        .order('sort', { ascending:true, nullsFirst:true })
+        .order('name', { ascending:true });
+      if (error) throw error;
+      const list = (data||[]);
+
+      const root = qs('#pageBody'); root.innerHTML=''; root.className='benefits';
+
+      // Grid layout: no slider logic
+
+      // Build cards
+      list.forEach(row=>{
+        const slide = document.createElement('div'); slide.className='benefit-card';
+        const card = document.createElement('article'); card.className='card';
+        // Logo
+        const logo = document.createElement('div'); logo.className='benefit-logo';
+        const img = document.createElement('img'); img.alt = row.name || 'Logo';
+        const raw = (row.logo_url||'');
+        try{
+          if (window.safeImageUrl && /^https?:/i.test(raw)){
+            window.safeImageUrl(raw).then(u=> img.src = u || raw).catch(()=> img.src = raw);
+          } else { img.src = raw; }
+        }catch{ img.src = raw; }
+        logo.appendChild(img);
+        if (row.discount_text){
+          const badge = document.createElement('div');
+          badge.className = 'benefit-badge';
+          try{ badge.textContent = String(row.discount_text||'').toLocaleUpperCase('tr-TR'); }
+          catch{ badge.textContent = String(row.discount_text||'').toUpperCase(); }
+          logo.appendChild(badge);
+        }
+        card.appendChild(logo);
+        // Divider under logo
+        const divider = document.createElement('div'); divider.className='benefit-divider'; card.appendChild(divider);
+        // Header
+        const head = document.createElement('div');
+        const name = document.createElement('div'); name.className='benefit-name'; name.textContent = row.name || '';
+        head.appendChild(name);
+        card.appendChild(head);
+        // Meta rows
+        const meta = document.createElement('div'); meta.className='benefit-meta';
+        function metaRow(kind, text){
+          const r = document.createElement('div'); r.className='meta-row';
+          const ic = document.createElement('div'); ic.className='meta-icon';
+          const svgPhone = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.09 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.31 1.77.57 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.14a2 2 0 0 1 2.11-.45c.84.26 1.71.45 2.61.57A2 2 0 0 1 22 16.92z"/></svg>';
+          const svgPin = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 5.25-9 12-9 12S3 15.25 3 10a9 9 0 1 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
+          const svgInfo = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>';
+          if (kind==='phone') ic.innerHTML = svgPhone; else if (kind==='address') ic.innerHTML = svgPin; else ic.innerHTML = svgInfo;
+          const tx = document.createElement('div'); tx.className='meta-text'; tx.textContent = text||'';
+          r.appendChild(ic); r.appendChild(tx);
+          return r;
+        }
+        if (row.phone) meta.appendChild(metaRow('phone', row.phone));
+        if (row.address) meta.appendChild(metaRow('address', row.address));
+        card.appendChild(meta);
+        // Actions
+        const actions = document.createElement('div'); actions.className='benefit-actions';
+        if (row.website){ const a = document.createElement('a'); a.href=row.website; a.target='_blank'; a.rel='noopener noreferrer'; a.className='btn btn-primary btn-pill'; a.textContent='Web'; actions.appendChild(a); }
+        if (row.phone){ const a = document.createElement('a'); a.href=`tel:${row.phone}`; a.className='btn btn-outline btn-pill'; a.textContent='Ara'; actions.appendChild(a); }
+        card.appendChild(actions);
+        slide.appendChild(card); root.appendChild(slide);
+      });
+      
+      buildToc();
+    }catch(e){ qs('#pageTitle').textContent='Üyelere Özel yüklenemedi'; console.error(e); }
+  }
+
+  function waitForSupabase(timeoutMs){
+    return new Promise(res=>{
+      if (window.ilkeSupabase) return res(true);
+      const t0=Date.now();
+      const it=setInterval(()=>{
+        if (window.ilkeSupabase){ clearInterval(it); res(true); }
+        else if (Date.now()-t0>= (timeoutMs||1500)){ clearInterval(it); res(false); }
+      },50);
+    });
+  }
+
+  async function renderLaw4688(){
+    try{
+      document.title = '4688 Sayılı Kanun | İlke Sendika';
+      qs('#pageTitle').textContent = '4688 Sayılı Kanun';
+      const metaEl = qs('#pageMeta'); if (metaEl) metaEl.hidden = true;
+      const root = qs('#pageBody'); root.innerHTML='';
+      try{
+        const res = await fetch('data/4688-kanun.html', { cache: 'no-store' });
+        if (res.ok){
+          const raw = await res.text();
+          const outHtml = sanitizeHtml(normalizeAlignment(raw));
+          renderA4(outHtml);
+          buildToc();
+          return;
+        }
+      }catch{}
+      renderA4(sanitizeHtml('<p>Kanun metni şu an yüklenemedi. Lütfen daha sonra tekrar deneyin.</p>'));
+      buildToc();
+    }catch(e){ qs('#pageTitle').textContent='Kanun sayfası yüklenemedi'; console.error(e); }
+  }
   // Parse optional crop meta from URLs like "...|z=1.00,ox=0,oy=0"
   function splitMetaUrl(u){
     const s = String(u||'');
@@ -27,12 +168,45 @@
   const params = new URLSearchParams(window.location.search);
   const slug = (params.get('slug')||'').trim().toLowerCase();
 
+  function ensureLawStyles(){
+    if (document.getElementById('law4688Styles')) return;
+    const st = document.createElement('style');
+    st.id = 'law4688Styles';
+    st.textContent = `
+      #pageBody.law-4688{ display:flex; justify-content:center; }
+      #pageBody.law-4688 .a4-wrap{ width:100%; display:flex; justify-content:center; }
+      #pageBody.law-4688 .a4-frame{
+        width: min(100%, 860px);
+        aspect-ratio: 210 / 297;
+        max-height: 85vh;
+        overflow: auto;
+        background: rgba(255,255,255,.9);
+        border: 1px solid rgba(0,0,0,.08);
+        border-radius: 12px;
+        box-shadow: 0 6px 24px rgba(0,0,0,.08);
+        padding: 18px;
+        content-visibility: auto;
+        contain: layout paint style;
+      }
+      @media (max-width: 600px){
+        #pageBody.law-4688 .a4-frame{ padding: 12px; max-height: 78vh; }
+      }
+      #pageBody.law-4688 .a4-frame h1:first-child, #pageBody.law-4688 .a4-frame h2:first-child{ margin-top:0; }
+    `;
+    document.head.appendChild(st);
+  }
+
+  function renderA4(innerHtml){
+    ensureLawStyles();
+    const root = qs('#pageBody');
+    if (!root) return;
+    root.classList.add('law-4688');
+    root.innerHTML = `<div class="a4-wrap"><article class="a4-frame">${innerHtml}</article></div>`;
+  }
+
   async function loadPage(){
     try{
-      if (!window.ilkeSupabase){
-        qs('#pageTitle').textContent = 'Yapılandırma bulunamadı';
-        return;
-      }
+      if (!await waitForSupabase(1500)){ qs('#pageTitle').textContent = 'Yapılandırma bulunamadı'; return; }
       if (!slug){
         qs('#pageTitle').textContent = 'Sayfa bulunamadı';
         return;
@@ -56,13 +230,18 @@
         await renderChairman();
         return;
       }
+      // Benefits (Üyelere Özel)
+      if (slug === 'uyelere-ozel'){
+        await renderBenefits();
+        return;
+      }
       if (!slug){
         qs('#pageTitle').textContent = 'Sayfa bulunamadı';
         return;
       }
       const { data, error } = await window.ilkeSupabase
         .from('pages')
-        .select('*')
+        .select('title, body, status, unpublish_at')
         .eq('slug', slug)
         .eq('status', 'published')
         .limit(1)
@@ -113,6 +292,10 @@
       if (metaEl) metaEl.hidden = true;
 
       const raw = String(data.body||'').trim();
+      if (slug === 'kanun'){
+        renderA4(raw);
+        return;
+      }
       const looksHtml = /<\s*[a-z][\s\S]*>/i.test(raw);
       function normalizeBullets(s){ return String(s||'').replace(/^\s*•\s+/gm, '- '); }
       const outHtml = looksHtml ? sanitizeHtml(normalizeAlignment(raw)) : sanitizeHtml(mdToHtml(normalizeBullets(raw)));
@@ -285,7 +468,17 @@
         img.alt = f.name || '';
         img.loading = 'lazy';
         img.decoding = 'async';
-        img.src = url || stripPhotoKey(f.image_url);
+        const srcRaw = url || stripPhotoKey(f.image_url);
+        // Hint for DOM interceptor to avoid eager request
+        try{ img.setAttribute('data-safe-src', srcRaw); }catch{}
+        // Apply using safeImageUrl if available; otherwise fallback to raw
+        try{
+          if (window.safeImageUrl && /^https?:/i.test(srcRaw)){
+            window.safeImageUrl(srcRaw).then(su => { img.src = su || srcRaw; }).catch(()=>{ img.src = srcRaw; });
+          } else {
+            img.src = srcRaw;
+          }
+        }catch{ img.src = srcRaw; }
         ph.appendChild(img);
         a.appendChild(ph);
         const h = document.createElement('h3'); h.textContent = f.name || '';
@@ -354,7 +547,9 @@
       const url = info.url || stripPhotoKey(row.photo_url);
       const meta = info.meta || { z:1, ox:0, oy:0 };
       if (url){
-        holder.style.backgroundImage = `url(${url})`;
+        let bgUrl = url;
+        try{ if (window.safeImageUrl && /^https?:/i.test(url)){ const su = await window.safeImageUrl(url); if (su) bgUrl = su; } }catch{}
+        holder.style.backgroundImage = `url(${bgUrl})`;
         const z = Number(meta.z||1); holder.style.backgroundSize = `${Math.max(100, Math.round(100*z))}%`;
         const ox = Number(meta.ox||0); const oy = Number(meta.oy||0);
         holder.style.backgroundPosition = `calc(50% + ${ox}px) calc(50% + ${oy}px)`;

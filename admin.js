@@ -27,6 +27,265 @@
     m.style.maxHeight = '90vh';
     m.style.overflow = 'auto';
   }
+
+  // ========== BENEFITS (Üyelere Özel) ==========
+  async function loadAdminBenefits(){
+    const tbody = qs('#benefitsTableBody'); if (!tbody) return; tbody.innerHTML = '';
+    try{
+      const table = tbody.closest('table');
+      const headRow = table && table.tHead && table.tHead.rows && table.tHead.rows[0];
+      if (headRow){
+        headRow.innerHTML = `
+          <th>Logo</th>
+          <th>Firma</th>
+          <th>İndirim</th>
+          <th>İletişim</th>
+          <th>Durum</th>
+          <th>Sıra</th>
+          <th class="col-actions">İşlem</th>
+        `;
+      }
+    }catch{}
+    try{
+      const { data, error } = await sb()
+        .from('benefits')
+        .select('id, name, discount_text, contact, website, phone, address, logo_url, status, sort, published_at')
+        .order('sort', { ascending:true, nullsFirst:true })
+        .order('name', { ascending:true });
+      if (error) throw error;
+      (data||[]).forEach(row=>{
+        const tr = document.createElement('tr');
+        const statusMap = { published:'Yayımlandı', draft:'Taslak', unpublished:'Yayından Kaldırıldı' };
+        const statusTr = statusMap[String(row.status||'').toLowerCase()] || (row.status||'');
+        const contact = row.phone ? ('Tel: ' + row.phone) : (row.website || '');
+        tr.innerHTML = `
+          <td>${row.logo_url ? `<img src="${escapeHtml(row.logo_url)}" alt="logo" style="max-height:34px">` : '-'}</td>
+          <td>${escapeHtml(row.name||'')}</td>
+          <td>${escapeHtml(row.discount_text||'')}</td>
+          <td>${escapeHtml(contact||'')}</td>
+          <td>${escapeHtml(statusTr)}</td>
+          <td>${row.sort != null ? String(row.sort) : '-'}</td>
+          <td class="actions">
+            <button class="btn btn-warning" data-edit-benefit="${row.id}">Düzenle</button>
+            ${row.status==='published' ? `<button class="btn btn-danger" data-unpub-benefit="${row.id}">Yayından Kaldır</button>` : `<button class="btn btn-success" data-pub-benefit="${row.id}">Yayınla</button>`}
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      const addBtn = qs('#newBenefitBtn'); if (addBtn && !addBtn.dataset.wired){ addBtn.dataset.wired='1'; addBtn.onclick = ()=> openBenefitModal({ id:null, name:'', discount_text:'', website:'', phone:'', address:'', logo_url:'', status:'draft', sort:null, published_at:null }); }
+      wireBenefitsRowActions();
+    }catch(e){ alert('Üyelere Özel listesi yüklenemedi: ' + (e?.message||String(e))); }
+  }
+
+  function wireBenefitsRowActions(){
+    try{
+      const tbody = qs('#benefitsTableBody'); if (!tbody) return;
+      tbody.querySelectorAll('button[data-edit-benefit]').forEach(btn=>{
+        if (btn.dataset.wired) return; btn.dataset.wired='1';
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-edit-benefit');
+          try{ const { data } = await sb().from('benefits').select('*').eq('id', id).maybeSingle(); openBenefitModal(data||{ id, name:'', discount_text:'', website:'', phone:'', address:'', logo_url:'', status:'draft', sort:null, published_at:null }); }
+          catch(err){ alert('Kayıt yüklenemedi: ' + (err?.message||String(err))); }
+        });
+      });
+      tbody.querySelectorAll('button[data-pub-benefit]').forEach(btn=>{
+        if (btn.dataset.wired) return; btn.dataset.wired='1';
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-pub-benefit');
+          try{ const { error } = await sb().from('benefits').update({ status:'published', published_at: new Date().toISOString() }).eq('id', id); if (error) throw error; await loadAdminBenefits(); }
+          catch(err){ alert('Yayınlanamadı: ' + (err?.message||String(err))); }
+        });
+      });
+      tbody.querySelectorAll('button[data-unpub-benefit]').forEach(btn=>{
+        if (btn.dataset.wired) return; btn.dataset.wired='1';
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-unpub-benefit');
+          try{ const { error } = await sb().from('benefits').update({ status:'unpublished' }).eq('id', id); if (error) throw error; await loadAdminBenefits(); }
+          catch(err){ alert('Yayından kaldırılamadı: ' + (err?.message||String(err))); }
+        });
+      });
+    }catch{}
+  }
+
+  function openBenefitModal(row){
+    try{
+      row = row || { id:null, name:'', discount_text:'', website:'', phone:'', address:'', logo_url:'', status:'draft', sort:null, published_at:null };
+      $modalTitle().textContent = row.id ? 'İş Yerini Düzenle' : 'Yeni İş Yeri';
+      const form = $modalForm(); form.innerHTML='';
+      const g = document.createElement('div'); g.style.display='grid'; g.style.gap='8px'; form.appendChild(g);
+      function field(label, input){ const L=document.createElement('label'); L.style.display='grid'; L.style.gap='6px'; L.innerHTML = `<span>${label}</span>`; L.appendChild(input); g.appendChild(L); return input; }
+      const iName=field('Firma Adı', Object.assign(document.createElement('input'), { value: row.name||'' }));
+      const iDiscount=field('İndirim / Kampanya', Object.assign(document.createElement('input'), { value: row.discount_text||'' }));
+      const iWebsite=field('Web Sitesi (https://)', Object.assign(document.createElement('input'), { value: row.website||'' }));
+      const iPhone=field('Telefon', Object.assign(document.createElement('input'), { value: row.phone||'' }));
+      const iAddress=field('Adres', Object.assign(document.createElement('textarea'), { value: row.address||'' }));
+      const iLogo=field('Logo URL', Object.assign(document.createElement('input'), { value: row.logo_url||'' }));
+      const iFile=document.createElement('input'); iFile.type='file'; iFile.accept='image/*'; field('Logo Yükle', iFile);
+      const stSel=document.createElement('select');
+      [
+        { v:'draft', t:'Taslak' },
+        { v:'published', t:'Yayımlandı' },
+        { v:'unpublished', t:'Yayından Kaldırıldı' },
+      ].forEach(({v,t})=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; if ((row.status||'draft')===v) o.selected=true; stSel.appendChild(o); });
+      field('Durum', stSel);
+      const iSort=field('Sıra', Object.assign(document.createElement('input'), { type:'number', value: row.sort==null?'':String(row.sort) }));
+      if (!row.id && (row.sort == null || row.sort === undefined)) {
+        (async ()=>{
+          try{
+            const { data: maxRow } = await sb().from('benefits').select('sort').order('sort', { ascending:false, nullsLast:true }).limit(1).maybeSingle();
+            const next = (Number(maxRow?.sort || 0) || 0) + 1;
+            if (!iSort.value) iSort.value = String(next);
+          }catch{}
+        })();
+      }
+      const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
+      const saveBtn=document.createElement('button'); saveBtn.type='button'; saveBtn.className='btn btn-success'; saveBtn.textContent='Kaydet'; actions.appendChild(saveBtn);
+      const cancelBtn=document.createElement('button'); cancelBtn.type='button'; cancelBtn.className='btn btn-danger'; cancelBtn.textContent='İptal'; actions.appendChild(cancelBtn);
+      if (row.id){
+        const delBtn=document.createElement('button'); delBtn.type='button'; delBtn.className='btn btn-danger'; delBtn.textContent='Sil'; actions.appendChild(delBtn);
+        delBtn.addEventListener('click', async (e)=>{
+          e.preventDefault();
+          try{
+            if (!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return;
+            const { error } = await sb().from('benefits').delete().eq('id', row.id);
+            if (error) throw error;
+            closeModal(); await loadAdminBenefits();
+          }catch(err){ alert('Silinemedi: ' + (err?.message||String(err))); }
+        });
+      }
+      g.appendChild(actions);
+      const origSaveText = saveBtn.textContent;
+      let saving = false;
+      cancelBtn.addEventListener('click', (e)=>{ e.preventDefault(); closeModal(); });
+      saveBtn.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        if (saving) return;
+        saving = true;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Kaydediliyor...';
+        try{
+          const payload = {
+            name: String(iName.value||'').trim(),
+            discount_text: String(iDiscount.value||'').trim(),
+            website: String(iWebsite.value||'').trim(),
+            phone: String(iPhone.value||'').trim(),
+            address: String(iAddress.value||'').trim(),
+            logo_url: String(iLogo.value||'').trim(),
+            status: String(stSel.value||'draft'),
+            sort: iSort.value ? Number(iSort.value) : null,
+          };
+          if (!payload.name){ alert('Firma adı gerekli'); return; }
+          try{
+            if (iFile.files && iFile.files[0]){
+              const f=iFile.files[0]; const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
+              const key=`benefits/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+              payload.logo_url = await uploadToBucketGeneric(f, 'images', key);
+            }
+            if (payload.status==='published' && !row.published_at){ payload.published_at = new Date().toISOString(); }
+            if (!row.id && (payload.sort == null)) {
+              try{
+                const { data: maxRow } = await sb().from('benefits').select('sort').order('sort', { ascending:false, nullsLast:true }).limit(1).maybeSingle();
+                const next = (Number(maxRow?.sort || 0) || 0) + 1;
+                payload.sort = next;
+              }catch{}
+            }
+            const q = row.id
+              ? sb().from('benefits').update(payload).eq('id', row.id)
+              : sb().from('benefits').insert(payload).select('id').single();
+            const { error } = await q; if (error) throw error;
+            closeModal(); await loadAdminBenefits();
+          }catch(err){ alert('Kaydedilemedi: ' + (err?.message||String(err))); }
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = origSaveText;
+          saving = false;
+        }
+      });
+      (typeof openModal === 'function' ? openModal() : (window.openModal && window.openModal()));
+    }catch(e){ alert('Form açılamadı: ' + (e?.message||String(e))); }
+  }
+
+  // Lazy-load fontkit for pdf-lib embedding of custom fonts
+  async function ensureFontkit(){
+    if (window.fontkit) return window.fontkit;
+    if (document.querySelector('script[data-fontkit]')){
+      for (let i=0;i<10;i++){ await new Promise(r=> setTimeout(r,150)); if (window.fontkit) return window.fontkit; }
+    }
+    const cdns = [
+      'vendor/fontkit/fontkit.umd.min.js',
+      'https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@0.0.4/dist/fontkit.umd.min.js',
+      'https://unpkg.com/@pdf-lib/fontkit@0.0.4/dist/fontkit.umd.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/fontkit.umd.min.js'
+    ];
+    for (const url of cdns){
+      try{
+        const s = document.createElement('script'); s.src=url; s.async=true; s.defer=true; s.setAttribute('data-fontkit','1');
+        const p = new Promise((resolve)=>{ s.onload=()=>resolve(window.fontkit||null); s.onerror=()=>resolve(null); });
+        document.head.appendChild(s);
+        const fk = await p; if (fk) return fk;
+      }catch{}
+    }
+    return null;
+  }
+
+  async function openMembershipFormHtmlPreview(member){
+    try{
+      const plateCode = await getProvincePlateCodeByName(member?.work_province);
+      $modalTitle().textContent = 'Üyelik Formu (Önizleme)';
+      const form = $modalForm(); form.innerHTML = '';
+      const tools = document.createElement('div');
+      tools.style.display='flex'; tools.style.gap='8px'; tools.style.justifyContent='flex-end'; tools.style.marginBottom='8px';
+      const btnPrint = document.createElement('button'); btnPrint.type='button'; btnPrint.className='btn btn-success'; btnPrint.textContent='Yazdır';
+      const note = document.createElement('div'); note.className='muted'; note.style.marginRight='auto'; note.textContent='PDF kütüphanesi yüklenemedi. Yazdırılabilir görünüm gösteriliyor.';
+      const grid = document.createElement('div');
+      grid.style.display='grid'; grid.style.gridTemplateColumns='1fr 1fr'; grid.style.gap='8px'; grid.style.padding='12px'; grid.style.background='white'; grid.style.border='1px solid #e5e7eb'; grid.style.borderRadius='8px';
+      const addRow = (label, value)=>{
+        const l = document.createElement('div'); l.style.fontWeight='700'; l.style.color='#E03B3B'; l.textContent=label;
+        const v = document.createElement('div'); v.style.whiteSpace='pre-wrap'; v.style.color='#0B3A60'; v.textContent=String(value||'');
+        grid.appendChild(l); grid.appendChild(v);
+      };
+      const fmtDate = (d)=>{ try{ if(!d) return ''; const parts=String(d).split('-'); if(parts.length===3){ return `${parts[2]}.${parts[1]}.${parts[0]}`; } return String(d);}catch{return String(d||'');} };
+      addRow('KURUMUN ADI', member?.institution_name);
+      addRow('GÖREV YAPILAN BİRİMİN ADI', member?.work_unit);
+      addRow('İL ADI', member?.work_province);
+      addRow('İL Kodu', plateCode);
+      addRow('İLÇE ADI', member?.work_district);
+      addRow('ADI', member?.first_name);
+      addRow('SOYADI', member?.last_name);
+      addRow('TC KİMLİK NO', member?.national_id);
+      addRow('BABA ADI', member?.father_name);
+      addRow('ANA ADI', member?.mother_name);
+      addRow('DOĞUM TARİHİ', fmtDate(member?.birth_date));
+      addRow('DOĞUM YERİ', member?.birth_place);
+      addRow('CİNSİYETİ', member?.gender);
+      addRow('ÖĞRENİM', member?.education);
+      addRow('KURUM SİCİL', member?.corp_reg_no);
+      addRow('KADRO ÜNVANI', member?.title);
+      addRow('T.C.EMEKLİ SANDIĞI', member?.retirement_no);
+      addRow('SOSYAL SİGORTALAR KURUMU', member?.ssk_no);
+      addRow('E-POSTA', member?.email);
+      addRow('CEP TEL', member?.phone);
+      btnPrint.addEventListener('click', ()=>{
+        try{
+          const w = window.open('', '_blank');
+          if (!w) return;
+          const safeTitle = 'Üyelik Formu';
+          w.document.open();
+          w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${safeTitle}</title><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:16px} .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px} .grid div{padding:6px 8px;border-bottom:1px dashed #e5e7eb} .grid div:nth-child(odd){font-weight:700;color:#E03B3B} .grid div:nth-child(even){color:#0B3A60}</style></head><body>`);
+          w.document.write(`<h3 style="margin:0 0 12px">Üyelik Formu</h3><div class="grid">${grid.innerHTML}</div>`);
+          w.document.write('</body></html>');
+          w.document.close();
+          w.focus(); w.print(); setTimeout(()=> w.close(), 400);
+        }catch{}
+      });
+      const left = document.createElement('div'); left.style.display='flex'; left.style.alignItems='center'; left.style.gap='8px';
+      left.appendChild(note);
+      form.appendChild(left);
+      tools.appendChild(btnPrint);
+      form.appendChild(tools);
+      form.appendChild(grid);
+      try{ (typeof openModal === 'function' ? openModal() : (window.openModal && window.openModal())); }catch{}
+    }catch{}
+  }
   function closeModal(){
     const m = $modal();
     if (!m) return;
@@ -83,7 +342,7 @@ function applyInlineStyle(prop, val){
     try{
       const { data, error } = await sb().from('admin_users').select('email, roles, allowed_tabs').order('email');
       if (error) throw error;
-      const tabNames = { news:'Haberler', ann:'Duyurular', msgs:'Mesajlar', pages:'Sayfalar', posters:'Afiş', reports:'Rapor', founders:'Kurucular', chairman:'Genel Başkan', members:'Üyeler', users:'Kullanıcılar', settings:'Ayarlar' };
+      const tabNames = { news:'Haberler', ann:'Duyurular', msgs:'Mesajlar', pages:'Sayfalar', benefits:'Üyelere Özel', posters:'Afiş', reports:'Rapor', founders:'Kurucular', chairman:'Genel Başkan', members:'Üyeler', users:'Kullanıcılar', settings:'Ayarlar' };
       (data||[]).forEach(row=>{
         const tr=document.createElement('tr');
         const roles = Array.isArray(row.roles)? row.roles.join(', ') : '';
@@ -185,6 +444,7 @@ function applyInlineStyle(prop, val){
       { v:'ann', t:'Duyurular' },
       { v:'msgs', t:'Mesajlar' },
       { v:'pages', t:'Sayfalar' },
+      { v:'benefits', t:'Üyelere Özel' },
       { v:'posters', t:'Afiş' },
       { v:'reports', t:'Rapor' },
       { v:'founders', t:'Kurucular' },
@@ -321,10 +581,15 @@ function applyInlineStyle(prop, val){
           <td>${escapeHtml(statusTr)}</td>
           <td>${jd}</td>
           <td class="actions">
-            <button class="btn btn-warning" data-edit-mem="${row.id}">Düzenle</button>
-            ${!isPending ? `<button class="btn btn-${status==='active'?'danger':'success'}" data-toggle-mem="${row.id}" data-status="${status}">${toggleText}</button>` : ''}
-            ${isPending ? `<button class="btn btn-success" data-approve-mem="${row.id}">Üyeliği Onayla</button>` : ''}
-            <button class="btn btn-primary" data-idcard-mem="${row.id}">Kimlik Göster</button>
+            <div class="row-1">
+              <button class="btn btn-warning" data-edit-mem="${row.id}">Düzenle</button>
+              <button class="btn btn-primary" data-printform-mem="${row.id}">Üyelik Formu Yazdır</button>
+            </div>
+            <div class="row-2" style="margin-top:6px">
+              ${!isPending ? `<button class="btn btn-${status==='active'?'danger':'success'}" data-toggle-mem="${row.id}" data-status="${status}">${toggleText}</button>` : ''}
+              ${isPending ? `<button class="btn btn-success" data-approve-mem="${row.id}">Üyeliği Onayla</button>` : ''}
+              <button class="btn btn-primary" data-idcard-mem="${row.id}">Kimlik Göster</button>
+            </div>
           </td>`;
         tbody.appendChild(tr);
       });
@@ -386,6 +651,17 @@ function applyInlineStyle(prop, val){
         }catch(e){ alert('Kimlik gösterilemedi: ' + (e?.message||String(e))); }
       });
     });
+    tbody.querySelectorAll('button[data-printform-mem]').forEach(btn=>{
+      if (btn.dataset.wired) return; btn.dataset.wired='1';
+      btn.addEventListener('click', async ()=>{
+        const id = btn.getAttribute('data-printform-mem');
+        try{
+          const { data } = await sb().from('members').select('*').eq('id', id).maybeSingle();
+          if (!data) return alert('Üye bulunamadı');
+          await generateMembershipFormPDF(data);
+        }catch(e){ alert('Form yazdırılamadı: ' + (e?.message||String(e))); }
+      });
+    });
     const addBtn = qs('#newMemberBtn'); if (addBtn) addBtn.onclick = ()=> openMemberModal({ id:null, status:'active' });
   }
 
@@ -405,10 +681,524 @@ function applyInlineStyle(prop, val){
     }catch{ return 1; }
   }
 
+  // Lazy-load pdf-lib if it isn't already available
+  async function ensurePdfLib(){
+    if (window.PDFLib && window.PDFLib.PDFDocument) return window.PDFLib;
+    if (window.pdfLib && window.pdfLib.PDFDocument) return window.pdfLib;
+    // prevent duplicate loads
+    if (document.querySelector('script[data-pdf-lib]')){
+      // wait for an existing load
+      for (let i=0;i<10;i++){
+        await new Promise(r=> setTimeout(r, 150));
+        if (window.PDFLib?.PDFDocument || window.pdfLib?.PDFDocument) return window.PDFLib || window.pdfLib;
+      }
+    }
+    const cdns = [
+      // Prefer local vendor first (works offline and bypasses CSP/CDN blocks)
+      'vendor/pdf-lib/pdf-lib.min.js',
+      'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+      'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'
+    ];
+    for (const url of cdns){
+      try{
+        const s = document.createElement('script');
+        s.src = url; s.async = true; s.defer = true; s.setAttribute('data-pdf-lib', '1');
+        const p = new Promise((resolve)=>{ s.onload = ()=> resolve(window.PDFLib || window.pdfLib || null); s.onerror = ()=> resolve(null); });
+        document.head.appendChild(s);
+        const mod = await p;
+        if (mod && mod.PDFDocument) return mod;
+      }catch{}
+    }
+    return null;
+  }
+
+  // Province plate code lookup with simple cache
+  async function getProvincePlateCodeByName(name){
+    const key = String(name||'').trim().toLowerCase();
+    if (!key) return '';
+    try{
+      window.__provMap = window.__provMap || null;
+      if (!window.__provMap){
+        // Try to load from localStorage cache first
+        try{ const raw = localStorage.getItem('ilkesen_prov_map_v1'); if (raw) window.__provMap = JSON.parse(raw); }catch{}
+      }
+      if (!window.__provMap){
+        const { data, error } = await sb().from('provinces').select('name,plate_code');
+        if (!error && data){
+          window.__provMap = {};
+          data.forEach(p=>{ const k=String(p.name||'').trim().toLowerCase(); if (k) window.__provMap[k] = p.plate_code; });
+          try{ localStorage.setItem('ilkesen_prov_map_v1', JSON.stringify(window.__provMap)); }catch{}
+        }
+      }
+      if (window.__provMap && key in window.__provMap){
+        const v = window.__provMap[key];
+        return v != null ? String(v) : '';
+      }
+      // Last attempt: single query ilike
+      try{
+        const { data } = await sb().from('provinces').select('plate_code,name').ilike('name', key).maybeSingle();
+        if (data && (data.plate_code!=null)){
+          window.__provMap = window.__provMap || {}; window.__provMap[key] = data.plate_code;
+          try{ localStorage.setItem('ilkesen_prov_map_v1', JSON.stringify(window.__provMap)); }catch{}
+          return String(data.plate_code);
+        }
+      }catch{}
+    }catch{}
+    return '';
+  }
+
+  async function generateMembershipFormPDF(member){
+    try{
+      const PDFLib = await ensurePdfLib();
+      if (!PDFLib || !PDFLib.PDFDocument) { await openMembershipFormHtmlPreview(member); return; }
+      const { PDFDocument, StandardFonts } = PDFLib;
+      // Resolve province plate code using cached list or DB
+      let plateCode = '';
+      try{ plateCode = await getProvincePlateCodeByName(member.work_province); }catch{}
+      // Prepare mapping
+      const fmtDate = (d)=>{ try{ if(!d) return ''; const parts=String(d).split('-'); if(parts.length===3){ return `${parts[2]}.${parts[1]}.${parts[0]}`; } return String(d);}catch{return String(d||'');} };
+      const values = {
+        'KURUMUN ADI': member.institution_name||'',
+        'GÖREV YAPILAN BİRİMİN ADI': member.work_unit||'',
+        'İL ADI': member.work_province||'',
+        'iL ADI': member.work_province||'',
+        'İL Kodu': plateCode||'',
+        'iL Kodu': plateCode||'',
+        'İLÇE ADI': member.work_district||'',
+        'ADI': member.first_name||'',
+        'SOYADI': member.last_name||'',
+        'TC KİMLİK NO': member.national_id||'',
+        'BABA ADI': member.father_name||'',
+        'ANA ADI': member.mother_name||'',
+        'DOĞUM TARİHİ': fmtDate(member.birth_date),
+        'DOĞUM YERİ': member.birth_place||'',
+        'CİNSİYETİ': member.gender||'',
+        'ÖĞRENİM': member.education||'',
+        'KURUM SİCİL': member.corp_reg_no||'',
+        'KADRO ÜNVANI': member.title||'',
+        'T.C.EMEKLİ SANDIĞI': member.retirement_no||'',
+        'SOSYAL SİGORTALAR KURUMU': member.ssk_no||'',
+        'E-POSTA': member.email||'',
+        'CEP TEL': member.phone||'',
+      };
+      // Load template with fallbacks for non-ascii filename encodings
+      async function fetchTpl(){
+        const urls = ['assets/üyelik.pdf', 'assets/%C3%BCyelik.pdf', 'assets/uyelik.pdf'];
+        for (const u of urls){ try{ const r = await fetch(u, { cache:'no-store' }); if (r.ok) return await r.arrayBuffer(); }catch{} }
+        throw new Error('Şablon PDF yüklenemedi');
+      }
+      const tplBytes = await fetchTpl();
+      const pdfDoc = await PDFDocument.load(tplBytes);
+      // Optional custom font for Turkish
+      let customFont = null;
+      try{
+        if (window.fontkit && pdfDoc.registerFontkit) { pdfDoc.registerFontkit(window.fontkit); }
+        const fontResp = await fetch('assets/fonts/Roboto-Regular.ttf');
+        if (fontResp.ok){
+          const fontBytes = await fontResp.arrayBuffer();
+          customFont = await pdfDoc.embedFont(fontBytes);
+        }
+      }catch{}
+      const form = pdfDoc.getForm();
+      const fields = form.getFields();
+      const norm = (s)=> String(s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9ÇĞİÖŞÜçğıöşü]/g,'').toLocaleUpperCase('tr-TR');
+      const catalog = (fields||[]).map(f=>({ n: norm(f.getName()), name: f.getName() }));
+      function setFieldSmart(label, val){
+        const v = String(val ?? '');
+        // 1) direct
+        try{ const tf = form.getTextField(label); tf.setText(v); return true; }catch{}
+        const key = norm(label);
+        // 2) match normalized equal
+        let hit = catalog.find(c=> c.n === key);
+        if (hit){ try{ form.getTextField(hit.name).setText(v); return true; }catch{} }
+        // 3) contains either way
+        hit = catalog.find(c=> c.n.includes(key) || key.includes(c.n));
+        if (hit){ try{ form.getTextField(hit.name).setText(v); return true; }catch{} }
+        return false;
+      }
+      Object.entries(values).forEach(([k,v])=>{ try{ setFieldSmart(k, v); }catch{} });
+      try{
+        if (!customFont){
+          try{ await ensureFontkit(); }catch{}
+        }
+        if (window.fontkit && pdfDoc.registerFontkit){ try{ pdfDoc.registerFontkit(window.fontkit); }catch{} }
+        if (customFont){ form.updateFieldAppearances(customFont); }
+        else { const helv = await pdfDoc.embedFont(StandardFonts.Helvetica); form.updateFieldAppearances(helv); }
+      }catch{}
+      try{ form.flatten(); }catch{}
+      // Fallback for non-form template: use coordinate map (with calibration support)
+      try{
+        const noFields = !form || (form.getFields && form.getFields().length === 0);
+        if (noFields){
+          const pages = pdfDoc.getPages(); const page = pages[0];
+          const { width, height } = page.getSize();
+          const drawerFont = customFont || await pdfDoc.embedFont(StandardFonts.Helvetica);
+          const defaultPageFrame = { x:0.29034749329320253, y:0.08080627461685956, w:0.40250965250965254, h:0.9048178200970485 };
+          const defaultCoords = {"kurum_adi":{"x":0.32115696712360275,"y":0.3054318129533846},"gorev_birim_adi":{"x":0.3192376374534848,"y":0.35759530361587766},"il_adi":{"x":0.32691495613395666,"y":0.5119992359768569},"il_kodu":{"x":0.6800716154356627,"y":0.5099126963503573},"ilce_adi":{"x":0.8182633516841563,"y":0.5099126963503573},"adi":{"x":0.3000443407523052,"y":0.6010249532392351},"soyadi":{"x":0.29812501108218714,"y":0.6364961268897303},"tc":{"x":0.2942863517419513,"y":0.6858775676187977},"baba":{"x":0.2962056814120692,"y":0.7195404103920329},"ana":{"x":0.726135527518494,"y":0.7216269500185325},"dogum_tarihi":{"x":0.2942863517419513,"y":0.7612712029220272},"dogum_yeri":{"x":0.7338128461989657,"y":0.7612712029220272},"kurum_sicil":{"x":0.3000443407523052,"y":0.8669892212773691},"unvan":{"x":0.3019636704224231,"y":0.9042687175968724},"eposta":{"x":0.6570396593942471,"y":0.8468193276085157},"cep":{"x":0.20983584625676072,"y":0.882290501259011},"sgk_sicil":{"x":0.2040778572464068,"y":0.8452892059779652},"uye_kayit_no":{"x":0.36146289019608013,"y":0.7091077122595342},"kabul_tarihi":{"x":0.3461082528351363,"y":0.7918737947233792},"cinsiyet_erkek":{"x":0.4977352967744557,"y":0.1732843298067924},"cinsiyet_kadin":{"x":0.8643272637669875,"y":0.17537086943329214},"ogrenim_ilkogretim":{"x":0.37489819788690587,"y":0.21292858271028706},"ogrenim_lise":{"x":0.5860244615998822,"y":0.2150151223367868},"ogrenim_yuksekokul":{"x":0.9161491648601727,"y":0.2150151223367868},"sgk_emekli":{"x":0.4919773077641018,"y":0.3881979113362636},"sgk_ssk":{"x":0.4900579780939839,"y":0.4236690849867588}};
+          const defaultStyles = {"kurum_adi":{"dx":-0.006000000000000001,"dy":-0.05500000000000001,"size":9.5},"gorev_birim_adi":{"dx":-0.003,"dy":-0.07900000000000003,"size":9.5},"il_adi":{"dx":0.07500000000000002,"dy":-0.14500000000000007,"size":9.5},"il_kodu":{"dx":-0.026999999999999996,"dy":-0.14200000000000007,"size":9.5},"ilce_adi":{"dx":-0.042,"dy":-0.14200000000000007,"size":9.5},"adi":{"dx":0.012,"dy":-0.1780000000000001,"size":9.5},"soyadi":{"dx":0.012,"dy":-0.19300000000000012,"size":9.5},"tc":{"dx":0.015,"dy":-0.21700000000000014,"size":9.5},"baba":{"dx":0.015,"dy":-0.22600000000000015,"size":9.5},"ana":{"dx":-0.018,"dy":-0.22900000000000015,"size":9.5},"dogum_tarihi":{"dx":0.018,"dy":-0.24700000000000016,"size":9.5},"dogum_yeri":{"dx":-0.026999999999999996,"dy":-0.24700000000000016,"size":9.5},"kurum_sicil":{"dx":0.012,"dy":-0.2890000000000002,"size":9.5},"unvan":{"dx":0.009000000000000001,"dy":-0.3070000000000002,"size":9.5},"eposta":{"dx":-0.045000000000000005,"dy":-0.12100000000000005,"size":9.5},"cep":{"dx":0,"dy":-0.13300000000000006,"size":9.5},"sgk_sicil":{"dx":0.24900000000000017,"dy":-0.19300000000000012,"size":9.5},"uye_kayit_no":{"dx":0.023999999999999997,"dy":0.11900000000000005,"size":16},"kabul_tarihi":{"dx":0.012,"dy":0.08600000000000003,"size":9.5},"cinsiyet_erkek":{"dx":-0.008999999999999994,"dy":0.3630000000000002,"size":10.5},"ogrenim_yuksekokul":{"dx":-0.06000000000000002,"dy":0.3420000000000002,"size":10},"cinsiyet_kadin":{"dx":-0.05400000000000001,"dy":0.36000000000000026,"size":10},"ogrenim_ilkogretim":{"dx":0.003,"dy":0.34500000000000025,"size":10},"ogrenim_lise":{"dx":-0.020999999999999998,"dy":0.34200000000000025,"size":10},"sgk_ssk":{"dx":0,"dy":-0.1680000000000001,"size":10}};
+          let coords = JSON.parse(JSON.stringify(defaultCoords));
+          try{ const raw = localStorage.getItem('ilkesen_pdf_coords_v1'); if (raw){ const m = JSON.parse(raw)||{}; Object.assign(coords, m); } }catch{}
+          let styles = JSON.parse(JSON.stringify(defaultStyles));
+          try{ const raw = localStorage.getItem('ilkesen_pdf_styles_v1'); if (raw){ const m = JSON.parse(raw)||{}; Object.assign(styles, m); } }catch{}
+          const needCal = false;
+          if (needCal){
+            const tplUrl = URL.createObjectURL(new Blob([tplBytes], { type:'application/pdf' }));
+            openPdfPreview('Üyelik Formu Kalibrasyon', tplUrl, member);
+            return;
+          }
+          function drawTxt(key, text, sz){
+            const c = coords[key]; if (!c) return; const st = styles[key]||{};
+            const dx = Number.isFinite(st.dx) ? st.dx : 0; const dy = Number.isFinite(st.dy) ? st.dy : 0; const fs = Number.isFinite(st.size) ? st.size : (sz||10);
+            const tx = Math.max(8, (c.x + dx) * width);
+            const ty = Math.max(8, height - ((c.y + dy) * height));
+            page.drawText(String(text||''), { x: tx, y: ty, size: fs, font: drawerFont });
+          }
+          function markX(key, sz){
+            const c = coords[key]; if (!c) return; const st = styles[key]||{};
+            const dx = Number.isFinite(st.dx) ? st.dx : 0; const dy = Number.isFinite(st.dy) ? st.dy : 0; const fs = Number.isFinite(st.size) ? st.size : (sz||12);
+            const tx = Math.max(6, (c.x + dx) * width); const ty = Math.max(6, height - ((c.y + dy) * height));
+            page.drawText('X', { x: tx, y: ty, size: fs, font: drawerFont });
+          }
+          drawTxt('kurum_adi', values['KURUMUN ADI']);
+          drawTxt('gorev_birim_adi', values['GÖREV YAPILAN BİRİMİN ADI']);
+          drawTxt('il_adi', values['İL ADI']);
+          drawTxt('il_kodu', values['İL Kodu']);
+          drawTxt('ilce_adi', values['İLÇE ADI']);
+          drawTxt('adi', values['ADI']);
+          drawTxt('soyadi', values['SOYADI']);
+          drawTxt('tc', values['TC KİMLİK NO']);
+          drawTxt('baba', values['BABA ADI']);
+          drawTxt('ana', values['ANA ADI']);
+          drawTxt('dogum_tarihi', values['DOĞUM TARİHİ']);
+          drawTxt('dogum_yeri', values['DOĞUM YERİ']);
+          drawTxt('kurum_sicil', values['KURUM SİCİL']);
+          drawTxt('unvan', values['KADRO ÜNVANI']);
+          drawTxt('eposta', values['E-POSTA']);
+          drawTxt('cep', values['CEP TEL']);
+          // Optional: admin tarafında mevcutsa
+          drawTxt('uye_kayit_no', member.member_no || '');
+          drawTxt('kabul_tarihi', fmtDate(member.join_date || ''));
+          let debugMarks = false; try{ debugMarks = localStorage.getItem('ilkesen_pdf_debug_marks_v1') === 'all'; }catch{}
+          if (debugMarks){
+            markX('cinsiyet_erkek'); markX('cinsiyet_kadin');
+            markX('ogrenim_ilkogretim'); markX('ogrenim_lise'); markX('ogrenim_yuksekokul');
+          } else {
+            let gk = '';
+            try{
+              const forceG = localStorage.getItem('ilkesen_pdf_force_gender_v1');
+              if (forceG==='erkek') gk = 'cinsiyet_erkek';
+              else if (forceG==='kadin') gk = 'cinsiyet_kadin';
+              else if (forceG==='none') gk = '';
+            }catch{}
+            if (!gk){
+              const g = String(member.gender||'').toLowerCase();
+              if (g.includes('erk') || g==='male') gk = 'cinsiyet_erkek';
+              else if (g.includes('kad') || g==='female') gk = 'cinsiyet_kadin';
+            }
+            if (gk) markX(gk);
+            function eduKey(v){
+              const s = String(v||'').toLowerCase();
+              if (!s) return '';
+              if (s.includes('ilkö') || s.includes('ilko') || s.includes('ilkokul') || s.includes('primary')) return 'ogrenim_ilkogretim';
+              if (s.includes('lise') || s.includes('ortaöğ') || s.includes('ortaog')) return 'ogrenim_lise';
+              if (s.includes('yüksek') || s.includes('yuksek') || s.includes('univers') || s.includes('ünivers') || s.includes('uni') || s.includes('yuksekokul') || s.includes('yüksekokul') || s.includes('lisans') || s.includes('onlisans') || s.includes('önlisans')) return 'ogrenim_yuksekokul';
+              const only = s.replace(/[^0-9]/g,'');
+              if (only==='1') return 'ogrenim_ilkogretim';
+              if (only==='2') return 'ogrenim_lise';
+              if (only==='3') return 'ogrenim_yuksekokul';
+              return '';
+            }
+            let ek = '';
+            try{
+              const force = localStorage.getItem('ilkesen_pdf_force_edu_v1');
+              if (force==='ilkogretim') ek = 'ogrenim_ilkogretim';
+              else if (force==='lise') ek = 'ogrenim_lise';
+              else if (force==='yuksekokul') ek = 'ogrenim_yuksekokul';
+            }catch{}
+            if (!ek){ ek = eduKey(member.education); }
+            if (ek) markX(ek);
+          }
+          const sgkNo = member.retirement_no || member.ssk_no || '';
+          drawTxt('sgk_sicil', sgkNo);
+        }
+      }catch{}
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      // Open directly in a new tab and trigger print
+      try{
+        const w = window.open(url, '_blank');
+        if (w) {
+          try{ w.focus(); }catch{}
+          setTimeout(()=>{ try{ w.print(); }catch{} }, 600);
+        } else {
+          alert('Yeni sekme engellendi. Lütfen bu site için açılır pencerelere izin verin ve tekrar deneyin.');
+        }
+      }catch{}
+    }catch(err){ alert('Form oluşturulamadı: ' + (err?.message||String(err))); }
+  }
+
+  function openPdfPreview(title, url, member){
+    try{
+      $modalTitle().textContent = title || 'PDF';
+      const form = $modalForm(); form.innerHTML = '';
+      const tools = document.createElement('div');
+      tools.style.display='flex'; tools.style.gap='8px'; tools.style.justifyContent='flex-end'; tools.style.marginBottom='8px';
+      const btnPrint = document.createElement('button'); btnPrint.type='button'; btnPrint.className='btn btn-success'; btnPrint.textContent='Yazdır';
+      const btnDownload = document.createElement('button'); btnDownload.type='button'; btnDownload.className='btn btn-primary'; btnDownload.textContent='İndir';
+      const btnOpen = document.createElement('button'); btnOpen.type='button'; btnOpen.className='btn btn-warning'; btnOpen.textContent='Yeni Sekmede Aç';
+      const btnCal = document.createElement('button'); btnCal.type='button'; btnCal.className='btn btn-secondary'; btnCal.textContent='Kalibrasyon';
+      const btnFull = document.createElement('button'); btnFull.type='button'; btnFull.className='btn'; btnFull.textContent='Tam Ekran';
+      const btnZoomOut = document.createElement('button'); btnZoomOut.type='button'; btnZoomOut.className='btn'; btnZoomOut.textContent='-';
+      const btnZoomIn = document.createElement('button'); btnZoomIn.type='button'; btnZoomIn.className='btn'; btnZoomIn.textContent='+';
+      const btnScroll = document.createElement('button'); btnScroll.type='button'; btnScroll.className='btn'; btnScroll.textContent='Kaydırma Modu';
+      const btnCorners = document.createElement('button'); btnCorners.type='button'; btnCorners.className='btn'; btnCorners.textContent='Sayfa Köşeleri';
+      const btnReset = document.createElement('button'); btnReset.type='button'; btnReset.className='btn btn-danger'; btnReset.textContent='Sıfırla';
+      const btnTune = document.createElement('button'); btnTune.type='button'; btnTune.className='btn'; btnTune.textContent='İnce Ayar';
+      const btnMarks = document.createElement('button'); btnMarks.type='button'; btnMarks.className='btn';
+      btnMarks.textContent = (localStorage.getItem('ilkesen_pdf_debug_marks_v1')==='all') ? 'İşaret Testi: Açık' : 'İşaret Testi';
+      const btnEdu = document.createElement('button'); btnEdu.type='button'; btnEdu.className='btn'; btnEdu.textContent='Öğrenim Seç';
+      const btnGender = document.createElement('button'); btnGender.type='button'; btnGender.className='btn'; btnGender.textContent='Cinsiyet Seç';
+      const wrap = document.createElement('div');
+      wrap.style.position='relative';
+      wrap.style.transformOrigin = 'top left';
+      let __scale = 1;
+      const iframe = document.createElement('iframe');
+      iframe.src = url; iframe.style.width='100%'; iframe.style.height='80vh'; iframe.style.border='1px solid #e5e7eb';
+      const overlay = document.createElement('div');
+      overlay.style.position='absolute'; overlay.style.left='0'; overlay.style.top='0'; overlay.style.right='0'; overlay.style.bottom='0'; overlay.style.display='none'; overlay.style.cursor='crosshair';
+      overlay.style.background='transparent';
+      wrap.appendChild(iframe); wrap.appendChild(overlay);
+      const scroller = document.createElement('div');
+      scroller.style.position='relative'; scroller.style.height='80vh'; scroller.style.overflow='auto';
+      scroller.appendChild(wrap);
+      btnPrint.addEventListener('click', ()=>{
+        try{ if (iframe.contentWindow) { iframe.contentWindow.focus(); iframe.contentWindow.print(); return; } }catch{}
+        try{ const w = window.open(url, '_blank'); if (w) { w.focus(); w.print(); } }catch{}
+      });
+      btnDownload.addEventListener('click', ()=>{
+        const a = document.createElement('a');
+        const safeName = `${String(member?.first_name||'').trim()}_${String(member?.last_name||'').trim()}`.replace(/[^A-Za-z0-9_çğıöşüİıÇĞÖŞÜ-]/g,'_');
+        a.href = url; a.download = `uyelik_formu_${safeName||member?.national_id||member?.id||''}.pdf`;
+        document.body.appendChild(a); a.click(); setTimeout(()=> a.remove(), 200);
+      });
+      btnOpen.addEventListener('click', ()=>{
+        try{ const w = window.open(url, '_blank'); if (w) { w.focus(); setTimeout(()=>{ try{ w.print(); }catch{} }, 600); } }catch{}
+      });
+      let calCtx = null;
+      btnCal.addEventListener('click', ()=>{
+        try{
+          const seq = [
+            ['kurum_adi','KURUMUN ADI'],
+            ['gorev_birim_adi','GÖREV YAPILAN BİRİMİN ADI'],
+            ['il_adi','İL ADI'],
+            ['il_kodu','İL Kodu'],
+            ['ilce_adi','İLÇE ADI'],
+            ['adi','ADI'],
+            ['soyadi','SOYADI'],
+            ['tc','TC KİMLİK NO'],
+            ['baba','BABA ADI'],
+            ['ana','ANA ADI'],
+            ['dogum_tarihi','DOĞUM TARİHİ'],
+            ['dogum_yeri','DOĞUM YERİ'],
+            ['kurum_sicil','KURUM SİCİL'],
+            ['unvan','KADRO ÜNVANI'],
+            ['eposta','E-POSTA'],
+            ['cep','CEP TEL'],
+            ['sgk_sicil','SGK SİCİL NO'],
+            ['uye_kayit_no','ÜYE KAYIT NUMARASI'],
+            ['kabul_tarihi','ÜYELİĞE KABUL TARİHİ'],
+            ['cinsiyet_erkek','CİNSİYET ERKEK kutusu'],
+            ['cinsiyet_kadin','CİNSİYET KADIN kutusu'],
+            ['ogrenim_ilkogretim','ÖĞRENİM İLKÖĞRETİM kutusu'],
+            ['ogrenim_lise','ÖĞRENİM LİSE kutusu'],
+            ['ogrenim_yuksekokul','ÖĞRENİM YÜKSEK OKUL kutusu']
+          ];
+          let i = 0;
+          let coords = {"kurum_adi":{"x":0.32115696712360275,"y":0.3054318129533846},"gorev_birim_adi":{"x":0.3192376374534848,"y":0.35759530361587766},"il_adi":{"x":0.32691495613395666,"y":0.5119992359768569},"il_kodu":{"x":0.6800716154356627,"y":0.5099126963503573},"ilce_adi":{"x":0.8182633516841563,"y":0.5099126963503573},"adi":{"x":0.3000443407523052,"y":0.6010249532392351},"soyadi":{"x":0.29812501108218714,"y":0.6364961268897303},"tc":{"x":0.2942863517419513,"y":0.6858775676187977},"baba":{"x":0.2962056814120692,"y":0.7195404103920329},"ana":{"x":0.726135527518494,"y":0.7216269500185325},"dogum_tarihi":{"x":0.2942863517419513,"y":0.7612712029220272},"dogum_yeri":{"x":0.7338128461989657,"y":0.7612712029220272},"kurum_sicil":{"x":0.3000443407523052,"y":0.8669892212773691},"unvan":{"x":0.3019636704224231,"y":0.9042687175968724},"eposta":{"x":0.6570396593942471,"y":0.8468193276085157},"cep":{"x":0.20983584625676072,"y":0.882290501259011},"sgk_sicil":{"x":0.2040778572464068,"y":0.8452892059779652},"uye_kayit_no":{"x":0.36146289019608013,"y":0.7091077122595342},"kabul_tarihi":{"x":0.3461082528351363,"y":0.7918737947233792},"cinsiyet_erkek":{"x":0.4977352967744557,"y":0.1732843298067924},"cinsiyet_kadin":{"x":0.8643272637669875,"y":0.17537086943329214},"ogrenim_ilkogretim":{"x":0.37489819788690587,"y":0.21292858271028706},"ogrenim_lise":{"x":0.5860244615998822,"y":0.2150151223367868},"ogrenim_yuksekokul":{"x":0.9161491648601727,"y":0.2150151223367868}};
+          let pageFrame = { x:0.29034749329320253, y:0.08080627461685956, w:0.40250965250965254, h:0.9048178200970485 };
+          try{ const raw = localStorage.getItem('ilkesen_pdf_coords_v1'); if (raw){ const m = JSON.parse(raw)||{}; Object.assign(coords, m); } }catch{}
+          try{ const raw2 = localStorage.getItem('ilkesen_pdf_pageframe_v1'); if (raw2){ const pf = JSON.parse(raw2)||null; if (pf) pageFrame = pf; } }catch{}
+          const bar = document.createElement('div');
+          bar.style.position='absolute'; bar.style.left='8px'; bar.style.top='8px'; bar.style.padding='6px 8px'; bar.style.background='rgba(17,24,39,.8)'; bar.style.color='#fff'; bar.style.borderRadius='6px'; bar.style.fontSize='12px'; bar.style.zIndex='10';
+          let stage = pageFrame ? 'fields' : 'corners';
+          let cornerStep = 0; // 0: TL, 1: BR
+          let tl = null, br = null;
+          function updateMsg(){
+            if (stage==='corners'){
+              bar.textContent = cornerStep===0 ? 'Sayfanın sol-üst köşesine tıklayın' : 'Sayfanın sağ-alt köşesine tıklayın';
+            } else {
+              bar.textContent = 'Tıklayın: ' + (seq[i] ? seq[i][1] : 'bitti') + '  |  Kaydır: alanı kaydırmak için Kaydırma Modu';
+            }
+          }
+          updateMsg();
+          overlay.innerHTML=''; overlay.appendChild(bar);
+          overlay.style.display='block';
+          function onClick(ev){
+            const r = overlay.getBoundingClientRect();
+            const ox = (ev.clientX - r.left) / r.width; const oy = (ev.clientY - r.top) / r.height;
+            if (stage==='corners'){
+              if (cornerStep===0){ tl = { x: ox, y: oy }; cornerStep = 1; }
+              else { br = { x: ox, y: oy }; stage='fields';
+                const x = Math.min(tl.x, br.x), y = Math.min(tl.y, br.y);
+                const w = Math.max(0.01, Math.abs(br.x - tl.x));
+                const h = Math.max(0.01, Math.abs(br.y - tl.y));
+                pageFrame = { x, y, w, h };
+                try{ localStorage.setItem('ilkesen_pdf_pageframe_v1', JSON.stringify(pageFrame)); }catch{}
+              }
+              updateMsg();
+              return;
+            }
+            if (!seq[i]){ finish(); return; }
+            let px = ox, py = oy;
+            if (pageFrame){
+              px = (ox - pageFrame.x) / pageFrame.w;
+              py = (oy - pageFrame.y) / pageFrame.h;
+              px = Math.max(0, Math.min(1, px));
+              py = Math.max(0, Math.min(1, py));
+            }
+            const key = seq[i][0]; coords[key] = { x: px, y: py };
+            i++; updateMsg();
+            if (i>=seq.length) finish();
+          }
+          function finish(){
+            overlay.style.display='none'; overlay.removeEventListener('click', onClick);
+            try{ localStorage.setItem('ilkesen_pdf_coords_v1', JSON.stringify(coords)); }catch{}
+            try{ if (member) generateMembershipFormPDF(member); }catch{}
+          }
+          overlay.addEventListener('click', onClick);
+          // Allow scrolling the calibration area while overlay is visible
+          overlay.addEventListener('wheel', (e)=>{ /* let it bubble to scroller */ }, { passive:true });
+          calCtx = {
+            pause(){ overlay.style.display='none'; },
+            resume(){ overlay.style.display='block'; }
+          };
+        }catch{}
+      });
+      btnCorners.addEventListener('click', ()=>{
+        try{
+          // Force re-capture of page frame only
+          localStorage.removeItem('ilkesen_pdf_pageframe_v1');
+          btnCal.click();
+        }catch{}
+      });
+      btnReset.addEventListener('click', ()=>{
+        try{ localStorage.removeItem('ilkesen_pdf_pageframe_v1'); localStorage.removeItem('ilkesen_pdf_coords_v1'); alert('Kalibrasyon sıfırlandı. Lütfen tekrar Kalibrasyon yapın.'); }catch{}
+      });
+      btnScroll.addEventListener('click', ()=>{ try{ if (!calCtx){ btnCal.click(); return; } const hidden = overlay.style.display==='none'; if (hidden){ calCtx.resume(); btnScroll.textContent='Kaydırma Modu'; } else { calCtx.pause(); btnScroll.textContent='Devam Et'; } }catch{} });
+      btnMarks.addEventListener('click', ()=>{
+        try{
+          const cur = localStorage.getItem('ilkesen_pdf_debug_marks_v1');
+          const next = cur==='all' ? '' : 'all';
+          if (next) localStorage.setItem('ilkesen_pdf_debug_marks_v1', next); else localStorage.removeItem('ilkesen_pdf_debug_marks_v1');
+          btnMarks.textContent = next==='all' ? 'İşaret Testi: Açık' : 'İşaret Testi';
+          if (member) generateMembershipFormPDF(member);
+        }catch{}
+      });
+
+      btnEdu.addEventListener('click', ()=>{
+        try{
+          const panel = document.createElement('div');
+          panel.style.position='absolute'; panel.style.left='8px'; panel.style.bottom='8px'; panel.style.background='rgba(17,24,39,.9)'; panel.style.color='#fff'; panel.style.padding='8px'; panel.style.borderRadius='8px'; panel.style.zIndex='11';
+          panel.style.display='flex'; panel.style.gap='6px';
+          function mkBtn(t, val){ const b=document.createElement('button'); b.type='button'; b.className='btn'; b.textContent=t; b.onclick=()=>{ try{ if(val) localStorage.setItem('ilkesen_pdf_force_edu_v1', val); else localStorage.removeItem('ilkesen_pdf_force_edu_v1'); if (member) generateMembershipFormPDF(member); panel.remove(); }catch{} }; return b; }
+          panel.appendChild(mkBtn('İlköğretim','ilkogretim'));
+          panel.appendChild(mkBtn('Lise','lise'));
+          panel.appendChild(mkBtn('Yüksek Okul','yuksekokul'));
+          panel.appendChild(mkBtn('Kaldır',null));
+          wrap.appendChild(panel);
+        }catch{}
+      });
+
+      
+
+      btnGender.addEventListener('click', ()=>{
+        try{
+          const panel = document.createElement('div');
+          panel.style.position='absolute'; panel.style.left='8px'; panel.style.bottom='48px'; panel.style.background='rgba(17,24,39,.9)'; panel.style.color='#fff'; panel.style.padding='8px'; panel.style.borderRadius='8px'; panel.style.zIndex='11';
+          panel.style.display='flex'; panel.style.gap='6px';
+          function mkBtn(t, val){ const b=document.createElement('button'); b.type='button'; b.className='btn'; b.textContent=t; b.onclick=()=>{ try{ if(val) localStorage.setItem('ilkesen_pdf_force_gender_v1', val); else localStorage.removeItem('ilkesen_pdf_force_gender_v1'); if (member) generateMembershipFormPDF(member); panel.remove(); }catch{} }; return b; }
+          panel.appendChild(mkBtn('Erkek','erkek'));
+          panel.appendChild(mkBtn('Kadın','kadin'));
+          panel.appendChild(mkBtn('Kaldır','none'));
+          wrap.appendChild(panel);
+        }catch{}
+      });
+
+      // Fine-tune UI for per-field offsets and font size
+      btnTune.addEventListener('click', ()=>{
+        try{
+          const panel = document.createElement('div');
+          panel.style.position='absolute'; panel.style.right='8px'; panel.style.top='8px'; panel.style.background='rgba(17,24,39,.9)'; panel.style.color='#fff'; panel.style.padding='8px'; panel.style.borderRadius='8px'; panel.style.zIndex='11'; panel.style.minWidth='220px';
+          const title = document.createElement('div'); title.textContent='İnce Ayar'; title.style.fontWeight='bold'; title.style.marginBottom='6px'; panel.appendChild(title);
+          const select = document.createElement('select'); select.style.width='100%'; select.style.marginBottom='6px';
+          const fields = [
+            'kurum_adi','gorev_birim_adi','il_adi','il_kodu','ilce_adi','adi','soyadi','tc','baba','ana','dogum_tarihi','dogum_yeri','kurum_sicil','unvan','eposta','cep','sgk_sicil','uye_kayit_no','kabul_tarihi','cinsiyet_erkek','cinsiyet_kadin','ogrenim_ilkogretim','ogrenim_lise','ogrenim_yuksekokul'
+          ];
+          fields.forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k; select.appendChild(o); });
+          panel.appendChild(select);
+          const row1 = document.createElement('div'); row1.style.display='flex'; row1.style.gap='6px'; row1.style.marginBottom='6px';
+          const bL = document.createElement('button'); bL.type='button'; bL.className='btn'; bL.textContent='←';
+          const bU = document.createElement('button'); bU.type='button'; bU.className='btn'; bU.textContent='↑';
+          const bD = document.createElement('button'); bD.type='button'; bD.className='btn'; bD.textContent='↓';
+          const bR = document.createElement('button'); bR.type='button'; bR.className='btn'; bR.textContent='→';
+          [bL,bU,bD,bR].forEach(b=>{ b.style.minWidth='34px'; });
+          row1.appendChild(bL); row1.appendChild(bU); row1.appendChild(bD); row1.appendChild(bR);
+          panel.appendChild(row1);
+          const row2 = document.createElement('div'); row2.style.display='flex'; row2.style.gap='6px'; row2.style.marginBottom='6px';
+          const bSm = document.createElement('button'); bSm.type='button'; bSm.className='btn'; bSm.textContent='A-';
+          const bLg = document.createElement('button'); bLg.type='button'; bLg.className='btn'; bLg.textContent='A+';
+          const bClr = document.createElement('button'); bClr.type='button'; bClr.className='btn'; bClr.textContent='Sıfırla Alan';
+          row2.appendChild(bSm); row2.appendChild(bLg); row2.appendChild(bClr);
+          panel.appendChild(row2);
+          const row3 = document.createElement('div'); row3.style.display='flex'; row3.style.gap='6px';
+          const bApply = document.createElement('button'); bApply.type='button'; bApply.className='btn btn-success'; bApply.textContent='Uygula';
+          const bClose = document.createElement('button'); bClose.type='button'; bClose.className='btn'; bClose.textContent='Kapat';
+          row3.appendChild(bApply); row3.appendChild(bClose); panel.appendChild(row3);
+          wrap.appendChild(panel);
+          function loadStyles(){ try{ return JSON.parse(localStorage.getItem('ilkesen_pdf_styles_v1')||'{}'); }catch{ return {}; } }
+          function saveStyles(m){ try{ localStorage.setItem('ilkesen_pdf_styles_v1', JSON.stringify(m||{})); }catch{} }
+          function mutate(fn){ const key = select.value; const m = loadStyles(); m[key] = m[key] || { dx:0, dy:0, size:10 }; fn(m[key]); saveStyles(m); }
+          const step = 0.003;
+          bL.onclick = ()=> mutate(s=> s.dx = (s.dx||0) - step);
+          bR.onclick = ()=> mutate(s=> s.dx = (s.dx||0) + step);
+          bU.onclick = ()=> mutate(s=> s.dy = (s.dy||0) - step);
+          bD.onclick = ()=> mutate(s=> s.dy = (s.dy||0) + step);
+          bSm.onclick = ()=> mutate(s=> s.size = Math.max(6, (s.size||10) - 0.5));
+          bLg.onclick = ()=> mutate(s=> s.size = Math.min(16, (s.size||10) + 0.5));
+          bClr.onclick = ()=>{ const m = loadStyles(); delete m[select.value]; saveStyles(m); };
+          bApply.onclick = ()=>{ try{ if (member) generateMembershipFormPDF(member); }catch{} };
+          bClose.onclick = ()=>{ try{ panel.remove(); }catch{} };
+        }catch{}
+      });
+      tools.appendChild(btnPrint); tools.appendChild(btnDownload);
+      tools.appendChild(btnOpen); tools.appendChild(btnCal); tools.appendChild(btnScroll); tools.appendChild(btnCorners); tools.appendChild(btnFull); tools.appendChild(btnZoomOut); tools.appendChild(btnZoomIn); tools.appendChild(btnMarks); tools.appendChild(btnEdu); tools.appendChild(btnGender); tools.appendChild(btnTune); tools.appendChild(btnReset);
+      form.appendChild(tools); form.appendChild(scroller);
+      btnFull.addEventListener('click', ()=>{
+        const fs = scroller.getAttribute('data-fullscreen') === '1';
+        if (!fs){ scroller.setAttribute('data-fullscreen','1'); scroller.style.height = 'calc(100vh - 140px)'; iframe.style.height = 'calc(100vh - 140px)'; btnFull.textContent='Pencere'; }
+        else { scroller.setAttribute('data-fullscreen','0'); scroller.style.height = '80vh'; iframe.style.height = '80vh'; btnFull.textContent='Tam Ekran'; }
+      });
+      function applyScale(){ wrap.style.transform = `scale(${__scale})`; }
+      btnZoomOut.addEventListener('click', ()=>{ __scale = Math.max(0.5, Math.round((__scale-0.1)*10)/10); applyScale(); });
+      btnZoomIn.addEventListener('click', ()=>{ __scale = Math.min(2.0, Math.round((__scale+0.1)*10)/10); applyScale(); });
+      // If iframe gets blocked by browser policy, auto-open new tab fallback
+      setTimeout(()=>{
+        try{
+          const cw = iframe.contentWindow;
+          const ok = !!cw;
+          if (!ok){ const w = window.open(url, '_blank'); if (w) w.focus(); }
+        }catch{ try{ const w = window.open(url, '_blank'); if (w) w.focus(); }catch{} }
+      }, 900);
+      try{ (typeof openModal === 'function' ? openModal() : (window.openModal && window.openModal())); }catch{}
+    }catch{}
+  }
+
   async function uploadToBucket(file, filePath) {
     try {
       // Normalize path: remove leading slashes and accidental bucket prefix
-      const cleanPath = filePath.replace(/^\/+/, ').replace(/^member-photos\//, ');
+      const cleanPath = String(filePath).replace(/^\/+/, '').replace(/^member-photos\//, '');
       
       // Upload to the root (or given subfolder) of the bucket
       const { error } = await sb()
@@ -1739,7 +2529,20 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
       const saveBtn=document.createElement('button'); saveBtn.className='btn btn-success'; saveBtn.textContent='Kaydet';
       const cancelBtn=document.createElement('button'); cancelBtn.className='btn btn-danger'; cancelBtn.textContent='İptal';
-      actions.appendChild(saveBtn); actions.appendChild(cancelBtn); form.appendChild(actions);
+      actions.appendChild(saveBtn); actions.appendChild(cancelBtn);
+      if (row.id){
+        const delBtn=document.createElement('button'); delBtn.className='btn btn-danger'; delBtn.textContent='Sil'; actions.appendChild(delBtn);
+        delBtn.addEventListener('click', async (e)=>{
+          e.preventDefault();
+          try{
+            if (!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return;
+            const { error } = await sb().from('pages').delete().eq('id', row.id);
+            if (error) throw error;
+            closeModal(); if (typeof loadAdminPages==='function') await loadAdminPages();
+          }catch(err){ alert('Silinemedi: ' + (err?.message||String(err))); }
+        });
+      }
+      form.appendChild(actions);
 
       cancelBtn.addEventListener('click', (e)=>{ e.preventDefault(); closeModal(); });
       saveBtn.addEventListener('click', async (e)=>{
@@ -2578,7 +3381,20 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
       const saveBtn=document.createElement('button'); saveBtn.className='btn btn-success'; saveBtn.textContent='Kaydet';
       const cancelBtn=document.createElement('button'); cancelBtn.className='btn btn-danger'; cancelBtn.textContent='İptal';
-      actions.appendChild(saveBtn); actions.appendChild(cancelBtn); form.appendChild(actions);
+      actions.appendChild(saveBtn); actions.appendChild(cancelBtn);
+      if (row.id){
+        const delBtn=document.createElement('button'); delBtn.className='btn btn-danger'; delBtn.textContent='Sil'; actions.appendChild(delBtn);
+        delBtn.addEventListener('click', async (e)=>{
+          e.preventDefault();
+          try{
+            if (!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return;
+            const { error } = await sb().from('news').delete().eq('id', row.id);
+            if (error) throw error;
+            closeModal(); if (typeof loadAdminNews==='function') await loadAdminNews();
+          }catch(err){ alert('Silinemedi: ' + (err?.message||String(err))); }
+        });
+      }
+      form.appendChild(actions);
 
       cancelBtn.addEventListener('click',(e)=>{ e.preventDefault(); closeModal(); });
       saveBtn.addEventListener('click', async (e)=>{
@@ -2709,7 +3525,20 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
       const saveBtn=document.createElement('button'); saveBtn.className='btn btn-success'; saveBtn.textContent='Kaydet';
       const cancelBtn=document.createElement('button'); cancelBtn.className='btn btn-danger'; cancelBtn.textContent='İptal';
-      actions.appendChild(saveBtn); actions.appendChild(cancelBtn); form.appendChild(actions);
+      actions.appendChild(saveBtn); actions.appendChild(cancelBtn);
+      if (row.id){
+        const delBtn=document.createElement('button'); delBtn.className='btn btn-danger'; delBtn.textContent='Sil'; actions.appendChild(delBtn);
+        delBtn.addEventListener('click', async (e)=>{
+          e.preventDefault();
+          try{
+            if (!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return;
+            const { error } = await sb().from('announcements').delete().eq('id', row.id);
+            if (error) throw error;
+            closeModal(); if (typeof loadAdminAnnouncements==='function') await loadAdminAnnouncements();
+          }catch(err){ alert('Silinemedi: ' + (err?.message||String(err))); }
+        });
+      }
+      form.appendChild(actions);
 
       cancelBtn.addEventListener('click',(e)=>{ e.preventDefault(); closeModal(); });
       saveBtn.addEventListener('click', async (e)=>{
@@ -3133,6 +3962,7 @@ function openReportModal(row){
       else if (currentTab === 'pages' && typeof loadAdminPages === 'function') await loadAdminPages();
       else if (currentTab === 'posters' && typeof loadAdminPosters === 'function') await loadAdminPosters();
       else if (currentTab === 'reports' && typeof loadAdminReports === 'function') await loadAdminReports();
+      else if (currentTab === 'benefits' && typeof loadAdminBenefits === 'function') await loadAdminBenefits();
       else if (currentTab === 'founders' && typeof loadAdminFounders === 'function') await loadAdminFounders();
       else if (currentTab === 'chairman' && typeof loadAdminChairman === 'function') await loadAdminChairman();
       else if (currentTab === 'members' && typeof loadAdminMembers === 'function') await loadAdminMembers();
@@ -3152,7 +3982,7 @@ function openReportModal(row){
 
   function applyTabPermissions(){
     try{
-      const defaultTabs = ['news','ann','msgs','pages','posters','reports','founders','chairman', 'members','users','settings'];
+      const defaultTabs = ['news','ann','msgs','pages','posters','reports','benefits','founders','chairman', 'members','users','settings'];
       const allowed = new Set((currentAdmin.allowed_tabs||[]).length ? currentAdmin.allowed_tabs : defaultTabs);
       defaultTabs.forEach(tab => {
         const btn = qs(`.tabs button[data-tab="${tab}"]`);
@@ -3179,10 +4009,16 @@ function openReportModal(row){
         $adminSection().hidden = false;
         $authStatus().textContent = data.session.user.email || 'Oturum açık';
         currentAdmin = await loadAdminPermissions(data.session.user.email);
+        try{
+          currentAdmin = currentAdmin || {};
+          const at = Array.isArray(currentAdmin.allowed_tabs) ? currentAdmin.allowed_tabs : [];
+          if (!at.includes('benefits')) at.push('benefits');
+          currentAdmin.allowed_tabs = at;
+        }catch{}
         applyTabPermissions();
         // ensure initial tab
         try{
-          const defaultTabs = ['news','ann','msgs','pages','posters','reports','founders','chairman', 'members','users','settings'];
+          const defaultTabs = ['news','ann','msgs','pages','posters','reports','benefits','founders','chairman', 'members','users','settings'];
           const isSuper = (currentAdmin.roles||[]).includes('superadmin');
           const allowed = new Set((currentAdmin.allowed_tabs||[]).length && !isSuper ? currentAdmin.allowed_tabs : defaultTabs);
           const order = ((currentAdmin.allowed_tabs||[]).length && !isSuper) ? currentAdmin.allowed_tabs : defaultTabs;
