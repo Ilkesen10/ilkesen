@@ -53,14 +53,22 @@ window.IlkeSendika = (function(){
 
       async function saveCache(){ try{ localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(window.__ilkesenGeoCache)); }catch{} }
       async function fetchProvinces(){
+        const upper = (s)=>{ try{ return String(s||'').toLocaleUpperCase('tr-TR'); }catch{ return String(s||'').toUpperCase(); } };
         const cache = await loadCache();
-        if (cache.provinces) return cache.provinces;
+        if (cache.provinces){
+          try{
+            const out = (cache.provinces||[]).map(p => Object.assign({}, p, { name: upper(p.name) }));
+            window.__ilkesenGeoCache.provinces = out; window.__ilkesenGeoCache.ts = Date.now(); await saveCache();
+            return out;
+          }catch{ return cache.provinces; }
+        }
         // Try DB first
         try{
           if (window.ilkeSupabase){
             const { data: provs, error } = await window.ilkeSupabase.from('provinces').select('id,name,plate_code').order('name');
             if (error) throw error;
-            window.__ilkesenGeoCache.provinces = provs || [];
+            const out = (provs||[]).map(p => ({ id: String(p.id), name: upper(p.name), plate_code: p.plate_code }));
+            window.__ilkesenGeoCache.provinces = out;
             window.__ilkesenGeoCache.ts = Date.now();
             await saveCache();
             return window.__ilkesenGeoCache.provinces;
@@ -71,7 +79,7 @@ window.IlkeSendika = (function(){
           const res = await fetch('data/districts_tr.json', { cache: 'no-store' });
           const obj = await res.json();
           const names = Object.keys(obj || {});
-          const provs = names.map((n, idx)=>({ id: String(idx+1), name: n, plate_code: null }));
+          const provs = names.map((n, idx)=>({ id: String(idx+1), name: upper(n), plate_code: null }));
           window.__ilkesenGeoCache.provinces = provs;
           window.__ilkesenGeoCache.ts = Date.now();
           await saveCache();
@@ -91,11 +99,13 @@ window.IlkeSendika = (function(){
             }
           }catch{}
         }
-        // Fallback by province name via static JSON
+        // Fallback by province name via static JSON (case-insensitive)
         try{
           const res = await fetch('data/districts_tr.json', { cache: 'no-store' });
           const obj = await res.json();
-          const list = (provinceName && obj && obj[provinceName]) ? obj[provinceName] : [];
+          const up = (s)=>{ try{ return String(s||'').toLocaleUpperCase('tr-TR'); }catch{ return String(s||'').toUpperCase(); } };
+          const pk = Object.keys(obj || {}).find(k => up(k) === up(provinceName));
+          const list = pk ? obj[pk] : [];
           const dists = (list||[]).map((n, idx)=>({ id: String(idx+1), name: n, province_id: provinceId || plateCode || provinceName || '' }));
           const key = cacheKey || (provinceName ? `pn:${provinceName}` : '');
           if (key){ window.__ilkesenGeoCache.districtsByProv[key] = dists; window.__ilkesenGeoCache.ts = Date.now(); await saveCache(); }
@@ -126,18 +136,57 @@ window.IlkeSendika = (function(){
     }catch(e){ console.warn('initPublicGeoSelectors error:', e); }
   }
 
+  // Public: enforce input filters (letters-only + TR uppercase) and digits-only for membership form
+  function initMembershipFormInputFilters(){
+    try{
+      if (!document.body || document.body.getAttribute('data-page') !== 'uyelik-basvurusu') return;
+      const form = document.getElementById('membershipForm');
+      if (!form) return;
+      const toUpperTR = (s)=>{ try{ return String(s||'').toLocaleUpperCase('tr-TR'); }catch{ return String(s||'').toUpperCase(); } };
+      const lettersOnly = (s)=> String(s||'').replace(/[^A-Za-zÇĞİÖŞÜçğıöşü\s]/g,'').replace(/\s+/g,' ');
+      const upperNames = ['first_name','last_name','father_name','mother_name','birth_place','institution_name','work_unit','title'];
+      upperNames.forEach(n=>{
+        const el = form.querySelector(`input[name="${n}"]`);
+        if (!el) return;
+        el.addEventListener('input', ()=>{ el.value = toUpperTR(lettersOnly(el.value)); });
+        el.addEventListener('blur', ()=>{ el.value = toUpperTR(lettersOnly(el.value)).trim(); });
+      });
+      function setDigitsOnly(name, maxLen){
+        const el = form.querySelector(`input[name="${name}"]`);
+        if (!el) return;
+        try{ el.setAttribute('inputmode','numeric'); }catch{}
+        if (maxLen) { try{ el.maxLength = maxLen; }catch{} }
+        el.addEventListener('input', ()=>{
+          let v = (el.value||'').replace(/\D/g,'');
+          if (maxLen) v = v.slice(0, maxLen);
+          el.value = v;
+        });
+      }
+      setDigitsOnly('national_id', 11);
+      setDigitsOnly('corp_reg_no');
+      setDigitsOnly('retirement_no');
+      setDigitsOnly('ssk_no');
+      const phone = form.querySelector('input[name="phone"]');
+      if (phone){
+        try{ phone.setAttribute('inputmode','numeric'); }catch{}
+        phone.maxLength = 10;
+        phone.addEventListener('input', ()=>{ phone.value = (phone.value||'').replace(/\D/g,'').slice(0,10); });
+      }
+    }catch(e){ console.warn('initMembershipFormInputFilters error:', e); }
+  }
+
   // Membership Application form handler
   api.handleMembershipApplySubmit = async function(e){
     e.preventDefault();
     const form = e.target;
     const fd = new FormData(form);
     // Read fields
-    const first_name = String(fd.get('first_name')||'').trim();
-    const last_name = String(fd.get('last_name')||'').trim();
-    const national_id = String(fd.get('national_id')||'').trim();
-    const father_name = String(fd.get('father_name')||'').trim();
-    const mother_name = String(fd.get('mother_name')||'').trim();
-    const birth_place = String(fd.get('birth_place')||'').trim();
+    let first_name = String(fd.get('first_name')||'').trim();
+    let last_name = String(fd.get('last_name')||'').trim();
+    let national_id = String(fd.get('national_id')||'').trim();
+    let father_name = String(fd.get('father_name')||'').trim();
+    let mother_name = String(fd.get('mother_name')||'').trim();
+    let birth_place = String(fd.get('birth_place')||'').trim();
     const birth_date = String(fd.get('birth_date')||'').trim();
     const gender = String(fd.get('gender')||'').trim();
     const education = String(fd.get('education')||'').trim();
@@ -146,16 +195,37 @@ window.IlkeSendika = (function(){
     const distSel = form.querySelector('select[name="work_district"]');
     const work_province_val = String(fd.get('work_province')||'').trim();
     const work_district_val = String(fd.get('work_district')||'').trim();
-    const institution_name = String(fd.get('institution_name')||'').trim();
-    const work_unit = String(fd.get('work_unit')||'').trim();
-    const corp_reg_no = String(fd.get('corp_reg_no')||'').trim();
-    const title = String(fd.get('title')||'').trim();
+    let institution_name = String(fd.get('institution_name')||'').trim();
+    let work_unit = String(fd.get('work_unit')||'').trim();
+    let work_unit_address = String(fd.get('work_unit_address')||'').trim();
+    let corp_reg_no = String(fd.get('corp_reg_no')||'').trim();
+    let title = String(fd.get('title')||'').trim();
     const blood_type = String(fd.get('blood_type')||'').trim();
-    const retirement_no = String(fd.get('retirement_no')||'').trim();
-    const ssk_no = String(fd.get('ssk_no')||'').trim();
+    let retirement_no = String(fd.get('retirement_no')||'').trim();
+    let ssk_no = String(fd.get('ssk_no')||'').trim();
     let email = String(fd.get('email')||'').trim();
     let phone = String(fd.get('phone')||'').trim();
     const kvkk = form.querySelector('input[name="kvkk"]');
+
+    // Normalize per requirements (uppercase letters-only for specified fields; digits-only for others except email)
+    {
+      const upperTR = (s)=>{ try{ return String(s||'').toLocaleUpperCase('tr-TR'); }catch{ return String(s||'').toUpperCase(); } };
+      const letters = (s)=> String(s||'').replace(/[^A-Za-zÇĞİÖŞÜçğıöşü\s]/g,' ').replace(/\s+/g,' ').trim();
+      first_name = upperTR(letters(first_name));
+      last_name = upperTR(letters(last_name));
+      father_name = upperTR(letters(father_name));
+      mother_name = upperTR(letters(mother_name));
+      birth_place = upperTR(letters(birth_place));
+      institution_name = upperTR(letters(institution_name));
+      work_unit = upperTR(letters(work_unit));
+      title = upperTR(letters(title));
+      const digits = (s, maxLen)=>{ let v=String(s||'').replace(/\D/g,''); return (maxLen? v.slice(0,maxLen): v); };
+      national_id = digits(national_id, 11);
+      corp_reg_no = digits(corp_reg_no);
+      retirement_no = digits(retirement_no);
+      ssk_no = digits(ssk_no);
+      phone = digits(phone, 10);
+    }
 
     // Required validations
     const req = [first_name,last_name,national_id,father_name,mother_name,birth_place,birth_date,gender,education,work_province_val,work_district_val,institution_name,work_unit,corp_reg_no,title,blood_type,email,phone];
@@ -233,6 +303,7 @@ window.IlkeSendika = (function(){
         first_name, last_name, national_id, father_name, mother_name,
         birth_place, birth_date, gender, education,
         work_province, work_district, institution_name, work_unit,
+        work_unit_address,
         corp_reg_no, title, blood_type, retirement_no, ssk_no,
         email, phone,
         status: 'pending',
@@ -1082,7 +1153,7 @@ try{
           document.body.getAttribute('data-page') === 'uyelik-basvurusu'
         )){
           // Lawyer/Membership request pages: init geo selects (if membership) then recaptcha
-          try{ if (document.body.getAttribute('data-page') === 'uyelik-basvurusu'){ initPublicGeoSelectors(); } }catch{}
+          try{ if (document.body.getAttribute('data-page') === 'uyelik-basvurusu'){ initPublicGeoSelectors(); initMembershipFormInputFilters(); } }catch{}
           try{
             const p = window.IlkeSendikaReload && window.IlkeSendikaReload.loadContactSettings ? window.IlkeSendikaReload.loadContactSettings() : null;
             if (p && typeof p.then === 'function'){
