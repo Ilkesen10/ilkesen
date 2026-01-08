@@ -1463,9 +1463,23 @@ holder.appendChild(bg);
       const map = new Map((data||[]).map(r => [r.key, r.value]));
       const logoUrl = map.get('footer_logo_url') || 'ilke-logo.png';
       const headerLogoUrl = map.get('header_logo_url') || null;
-      const addr = map.get('footer_address') || null;
-      const email = map.get('footer_email') || null;
-      const phone = map.get('footer_phone') || null;
+      const PLACEHOLDER = 'Güncellenecektir';
+      const rawAddr = map.get('footer_address') || null;
+      const rawEmail = map.get('footer_email') || null;
+      const rawPhone = map.get('footer_phone') || null;
+      const normalizePhone = (p)=> String(p||'').replace(/\D/g,'');
+      const isBadAddr = (v)=> /Beştepe Mahallesi|Zübeyde Hanım Caddesi/i.test(String(v||''));
+      const isBadEmail = (v)=> /hurriyetciyerelsen\.org/i.test(String(v||''));
+      const isBadPhone = (v)=> {
+        const n = normalizePhone(v);
+        if (!n) return false;
+        const last10 = n.slice(-10);
+        const last11 = n.slice(-11);
+        return last10 === '3125524060' || last11 === '03125524060';
+      };
+      const addr = (rawAddr && !isBadAddr(rawAddr)) ? rawAddr : null;
+      const email = (rawEmail && !isBadEmail(rawEmail)) ? rawEmail : null;
+      const phone = (rawPhone && !isBadPhone(rawPhone)) ? rawPhone : null;
       const sTwitter = map.get('social_twitter') || '';
       const sFacebook = map.get('social_facebook') || '';
       const sInstagram = map.get('social_instagram') || '';
@@ -1495,7 +1509,7 @@ holder.appendChild(bg);
       const headerLogo = document.getElementById('headerLogo'); if (headerLogo && (headerLogoUrl || logoUrl)) headerLogo.src = buster(effectiveHeaderLogoUrl);
       const addrEl = document.getElementById('footerAddress');
       if (addrEl){
-        const full = String(addr || addrEl.textContent || '').trim();
+        const full = String(addr || addrEl.textContent || PLACEHOLDER).trim();
         let short = full;
         try{
           // Tercih: "İlçe/İl" ya da "İlçe, İl"
@@ -1525,8 +1539,8 @@ holder.appendChild(bg);
         }catch{}
         addrEl.textContent = short;
       }
-      const emailEl = document.getElementById('footerEmail'); if (emailEl && email) emailEl.textContent = email;
-      const phoneEl = document.getElementById('footerPhone'); if (phoneEl && phone) phoneEl.textContent = phone;
+      const emailEl = document.getElementById('footerEmail'); if (emailEl) emailEl.textContent = email || PLACEHOLDER;
+      const phoneEl = document.getElementById('footerPhone'); if (phoneEl) phoneEl.textContent = phone || PLACEHOLDER;
 
       function setLink(id, url){
         const a = document.getElementById(id);
@@ -1553,10 +1567,24 @@ holder.appendChild(bg);
         .in('key', ['footer_address','footer_email','footer_phone','recaptcha_site_key']);
       if (error) throw error;
       const map = new Map((data||[]).map(r => [r.key, r.value]));
-      const setText = (id, val) => { const el = document.getElementById(id); if (el && val) el.textContent = val; };
-      setText('contactAddress', map.get('footer_address') || '');
-      setText('contactEmail', map.get('footer_email') || '');
-      setText('contactPhone', map.get('footer_phone') || '');
+      const PLACEHOLDER = 'Güncellenecektir';
+      const normalizePhone = (p)=> String(p||'').replace(/\D/g,'');
+      const isBadAddr = (v)=> /Beştepe Mahallesi|Zübeyde Hanım Caddesi/i.test(String(v||''));
+      const isBadEmail = (v)=> /hurriyetciyerelsen\.org/i.test(String(v||''));
+      const isBadPhone = (v)=> {
+        const n = normalizePhone(v);
+        if (!n) return false;
+        const last10 = n.slice(-10);
+        const last11 = n.slice(-11);
+        return last10 === '3125524060' || last11 === '03125524060';
+      };
+      const safeAddr = (()=>{ const v = map.get('footer_address') || ''; return v && !isBadAddr(v) ? v : ''; })();
+      const safeEmail = (()=>{ const v = map.get('footer_email') || ''; return v && !isBadEmail(v) ? v : ''; })();
+      const safePhone = (()=>{ const v = map.get('footer_phone') || ''; return v && !isBadPhone(v) ? v : ''; })();
+      const setText = (id, val) => { const el = document.getElementById(id); if (!el) return; el.textContent = val || PLACEHOLDER; };
+      setText('contactAddress', safeAddr);
+      setText('contactEmail', safeEmail);
+      setText('contactPhone', safePhone);
       const siteKey = map.get('recaptcha_site_key');
       if (siteKey){
         window.IlkeSendikaRecaptcha = window.IlkeSendikaRecaptcha || {};
