@@ -97,6 +97,7 @@ serve(async (req: Request) => {
       work_district: payload.work_district,
       institution_name: payload.institution_name,
       work_unit: payload.work_unit,
+      work_unit_address: payload.work_unit_address ?? null,
       corp_reg_no: payload.corp_reg_no,
       title: payload.title,
       blood_type: payload.blood_type,
@@ -113,12 +114,23 @@ serve(async (req: Request) => {
       documents_urls,
     };
 
-    const { error } = await supabase.from("members").insert(row);
+    let { error } = await supabase.from("members").insert(row);
     if (error) {
-      return new Response(
-        JSON.stringify({ error: "insert_failed", details: error }),
-        { status: 400, headers }
-      );
+      const msg = (error.message || "") + " " + (error.details || "");
+      const code = String((error as any).code || "");
+      if ((code === "42703" || /undefined column|does not exist/i.test(msg)) && /work_unit_address/.test(msg)){
+        try{
+          delete row.work_unit_address;
+          const r2 = await supabase.from("members").insert(row);
+          error = r2.error || null;
+        }catch{}
+      }
+      if (error) {
+        return new Response(
+          JSON.stringify({ error: "insert_failed", details: error }),
+          { status: 400, headers }
+        );
+      }
     }
 
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers });

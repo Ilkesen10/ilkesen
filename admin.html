@@ -208,6 +208,7 @@
         <button data-tab="pages">Sayfalar</button>
         <button data-tab="posters">Afiş</button>
         <button data-tab="reports">Rapor</button>
+        <button data-tab="docs">Evrak Modülü</button>
         <button data-tab="benefits">Üyelere Özel</button>
         <button data-tab="founders">Kurucular</button>
         <button data-tab="chairman">Genel Başkan</button>
@@ -342,6 +343,32 @@
             </tr>
           </thead>
           <tbody id="reportsTableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- EVRAK MODÜLÜ -->
+      <div id="tab-docs" class="tab-panel">
+        <div class="toolbar">
+          <div id="docsSubTabs" class="btn-group">
+            <button class="btn btn-outline active" id="incomingSubTabBtn" data-docs-subtab="incoming">Gelen Evrak</button>
+            <button class="btn btn-outline" id="outgoingSubTabBtn" data-docs-subtab="outgoing">Giden Evrak</button>
+          </div>
+          <button id="newIncomingDocBtn" class="btn btn-primary right" type="button">Evrak Kaydet</button>
+        </div>
+        <table class="table" aria-label="Gelen Evrak Tablosu">
+          <thead>
+            <tr>
+              <th>Kayıt Sıra No</th>
+              <th>Geldiği Kişi/Kurum</th>
+              <th>Tarihi</th>
+              <th>Sayısı</th>
+              <th>Eki</th>
+              <th>Konusu</th>
+              <th>Muhafaza Dosya No</th>
+              <th>Dosya</th>
+            </tr>
+          </thead>
+          <tbody id="incomingDocsTableBody"></tbody>
         </table>
       </div>
 

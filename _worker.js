@@ -3,6 +3,10 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
+    const isAsset = (p) => {
+      const last = (p.split('/').filter(Boolean).pop() || '');
+      return last.includes('.');
+    };
     
     // Handle trailing slashes
     if (path !== '/' && path.endsWith('/')) {
@@ -23,20 +27,33 @@ export default {
     };
     
     if (routes[path]) {
-      return env.ASSETS.fetch(request.clone({ url: url.origin + routes[path] + url.search }));
+      return env.ASSETS.fetch(new Request(url.origin + routes[path] + url.search, request));
+    }
+
+    if (isAsset(path)) {
+      return env.ASSETS.fetch(request);
+    }
+
+    if (path === '/page') {
+      return env.ASSETS.fetch(request);
     }
     
     // Handle dynamic pages
-    if (path.startsWith('/page/') || path.startsWith('/disiplin-kurulu') || 
-        path.startsWith('/genel-baskan') || path.startsWith('/vizyon') || 
-        path.startsWith('/misyon') || path.startsWith('/amac') || 
-        path.startsWith('/kurucular') || path.startsWith('/yonetim-kurulu') || 
-        path.startsWith('/denetleme-kurulu') || path.startsWith('/afis') || 
-        path.startsWith('/rapor') || path.startsWith('/kanun')) {
-      
-      const slug = path.replace(/^\/+/, '');
-      const pageUrl = url.origin + '/page.html?slug=' + encodeURIComponent(slug) + url.search;
-      return env.ASSETS.fetch(request.clone({ url: pageUrl }));
+    if (path.startsWith('/page/')) {
+      const slug = path.slice('/page/'.length).replace(/\/+$/,'');
+      const pageUrl = new URL(url.origin + '/page');
+      pageUrl.searchParams.set('slug', slug);
+      url.searchParams.forEach((v, k) => { if (k !== 'slug') pageUrl.searchParams.set(k, v); });
+      return env.ASSETS.fetch(new Request(pageUrl.toString(), request));
+    }
+
+    const parts = path.split('/').filter(Boolean);
+    if (parts.length === 1) {
+      const slug = parts[0];
+      const pageUrl = new URL(url.origin + '/page');
+      pageUrl.searchParams.set('slug', slug);
+      url.searchParams.forEach((v, k) => { if (k !== 'slug') pageUrl.searchParams.set(k, v); });
+      return env.ASSETS.fetch(new Request(pageUrl.toString(), request));
     }
     
     // Default to Assets

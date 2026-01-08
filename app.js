@@ -1630,7 +1630,7 @@ holder.appendChild(bg);
       items.forEach(p=>{
         const li=document.createElement('div'); li.className='hp-item';
         const card=document.createElement('article'); card.className='hp-card';
-        const a=document.createElement('a'); a.href='page.html?slug=afis'; a.setAttribute('aria-label', p.title||'Afiş');
+        const a=document.createElement('a'); a.href='/afis'; a.setAttribute('aria-label', p.title||'Afiş');
         const img=document.createElement('img'); img.src=p.image_url; img.alt=p.title||'Afiş';
         a.appendChild(img); card.appendChild(a); li.appendChild(card); track.appendChild(li);
       });

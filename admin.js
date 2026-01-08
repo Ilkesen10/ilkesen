@@ -305,6 +305,8 @@
   let editing = null; // { type: 'news'|'ann', id: string|null }
   let messagesById = new Map();
   let currentMsgCategory = 'all';
+  let currentDocsSubTab = 'incoming';
+  let incomingDocsById = new Map();
 
 // Seçime inline stil uygula (ör. font-size)
 // NOTE: Tek bir kez, IIFE içinde üst seviye scope’a ekleyin.
@@ -445,6 +447,7 @@ function applyInlineStyle(prop, val){
       { v:'ann', t:'Duyurular' },
       { v:'msgs', t:'Mesajlar' },
       { v:'pages', t:'Sayfalar' },
+      { v:'docs', t:'Evrak Modülü' },
       { v:'benefits', t:'Üyelere Özel' },
       { v:'posters', t:'Afiş' },
       { v:'reports', t:'Rapor' },
@@ -2908,6 +2911,7 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
             <button class="btn btn-warning" data-view-msg="${row.id}">Oku</button>
             <button class="btn btn-success" data-reply-msg="${row.id}">Cevapla</button>
             ${row && row.is_read ? '' : `<button class=\"btn btn-outline\" data-read-msg=\"${row.id}\">Okundu</button>`}
+            <button class="btn btn-danger" data-del-msg="${row.id}">Sil</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -2958,6 +2962,18 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
             }
           }catch{}
           openEmailCompose(row.email, row.subject, id, async ()=>{ try{ await loadAdminMessages(); }catch{} });
+          try{ await loadAdminMessages(); }catch{}
+        });
+      });
+      tbody.querySelectorAll('button[data-del-msg]').forEach(btn=>{
+        if (btn.dataset.wired) return; btn.dataset.wired='1';
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-del-msg');
+          if (!id) return;
+          if (!confirm('Bu mesajı silmek istediğinize emin misiniz?')) return;
+          try{
+            await sb().from('messages').delete().eq('id', id);
+          }catch(e){ alert('Silinemedi: ' + (e?.message||String(e))); return; }
           try{ await loadAdminMessages(); }catch{}
         });
       });
@@ -3094,10 +3110,14 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       const replyBtn = document.createElement('button');
       replyBtn.className = 'btn btn-success';
       replyBtn.textContent = 'Cevapla';
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn btn-danger';
+      delBtn.textContent = 'Sil';
       const closeBtn = document.createElement('button');
       closeBtn.className = 'btn btn-danger';
       closeBtn.textContent = 'Kapat';
       actions.appendChild(replyBtn);
+      actions.appendChild(delBtn);
       actions.appendChild(closeBtn);
       wrap.appendChild(actions);
 
@@ -3105,6 +3125,17 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
       replyBtn.addEventListener('click', (e)=>{
         e.preventDefault();
         openEmailCompose(fullRow?.email, fullRow?.subject, fullRow?.id, async ()=>{ try{ await loadAdminMessages(); }catch{} });
+      });
+      delBtn.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        const id = fullRow?.id;
+        if (!id) return;
+        if (!confirm('Bu mesajı silmek istediğinize emin misiniz?')) return;
+        try{
+          await sb().from('messages').delete().eq('id', id);
+          closeModal();
+          await loadAdminMessages();
+        }catch(err){ alert('Silinemedi: ' + (err?.message||String(err))); }
       });
 
       (typeof openModal === 'function' ? openModal() : (window.openModal && window.openModal()));
@@ -4019,6 +4050,7 @@ function openReportModal(row){
       else if (currentTab === 'pages' && typeof loadAdminPages === 'function') await loadAdminPages();
       else if (currentTab === 'posters' && typeof loadAdminPosters === 'function') await loadAdminPosters();
       else if (currentTab === 'reports' && typeof loadAdminReports === 'function') await loadAdminReports();
+      else if (currentTab === 'docs' && typeof loadAdminDocs === 'function') await loadAdminDocs();
       else if (currentTab === 'benefits' && typeof loadAdminBenefits === 'function') await loadAdminBenefits();
       else if (currentTab === 'founders' && typeof loadAdminFounders === 'function') await loadAdminFounders();
       else if (currentTab === 'chairman' && typeof loadAdminChairman === 'function') await loadAdminChairman();
@@ -4039,7 +4071,7 @@ function openReportModal(row){
 
   function applyTabPermissions(){
     try{
-      const defaultTabs = ['news','ann','msgs','pages','posters','reports','benefits','founders','chairman', 'members','users','settings'];
+      const defaultTabs = ['news','ann','msgs','pages','posters','reports','docs','benefits','founders','chairman', 'members','users','settings'];
       const allowed = new Set((currentAdmin.allowed_tabs||[]).length ? currentAdmin.allowed_tabs : defaultTabs);
       defaultTabs.forEach(tab => {
         const btn = qs(`.tabs button[data-tab="${tab}"]`);
@@ -4075,7 +4107,7 @@ function openReportModal(row){
         applyTabPermissions();
         // ensure initial tab
         try{
-          const defaultTabs = ['news','ann','msgs','pages','posters','reports','benefits','founders','chairman', 'members','users','settings'];
+          const defaultTabs = ['news','ann','msgs','pages','posters','reports','docs','benefits','founders','chairman', 'members','users','settings'];
           const isSuper = (currentAdmin.roles||[]).includes('superadmin');
           const allowed = new Set((currentAdmin.allowed_tabs||[]).length && !isSuper ? currentAdmin.allowed_tabs : defaultTabs);
           const order = ((currentAdmin.allowed_tabs||[]).length && !isSuper) ? currentAdmin.allowed_tabs : defaultTabs;
@@ -4087,6 +4119,332 @@ function openReportModal(row){
         showLogin();
       }
     }catch{ showLogin(); }
+  }
+
+  // ========== EVRAK MODÜLÜ (DOCS) ==========
+  async function loadAdminDocs(){
+    try{
+      // Sub-tab wiring
+      const incBtn = document.getElementById('incomingSubTabBtn');
+      const outBtn = document.getElementById('outgoingSubTabBtn');
+      const newBtn = document.getElementById('newIncomingDocBtn');
+      if (incBtn && !incBtn.dataset.wired){
+        incBtn.dataset.wired='1';
+        incBtn.addEventListener('click', (e)=>{
+          e.preventDefault();
+          currentDocsSubTab = 'incoming';
+          try{ incBtn.className = 'btn btn-success'; }catch{}
+          try{ if (outBtn) outBtn.className = 'btn btn-outline'; }catch{}
+          if (newBtn) newBtn.style.display = '';
+          loadAdminIncomingDocs();
+        });
+      }
+      if (outBtn && !outBtn.dataset.wired){
+        outBtn.dataset.wired='1';
+        outBtn.addEventListener('click', (e)=>{
+          e.preventDefault();
+          currentDocsSubTab = 'outgoing';
+          try{ outBtn.className = 'btn btn-success'; }catch{}
+          try{ if (incBtn) incBtn.className = 'btn btn-outline'; }catch{}
+          if (newBtn) newBtn.style.display = 'none';
+          // Outgoing UI will be implemented later
+          const tbody = document.getElementById('incomingDocsTableBody');
+          if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="muted">Giden Evrak yakında eklenecek.</td></tr>';
+        });
+      }
+      if (newBtn && !newBtn.dataset.wired){
+        newBtn.dataset.wired='1';
+        newBtn.addEventListener('click', async (e)=>{ e.preventDefault(); await openIncomingDocModal(null); });
+      }
+
+      // Default load and style
+      if (currentDocsSubTab !== 'outgoing'){
+        if (incBtn) incBtn.className = 'btn btn-success';
+        if (outBtn) outBtn.className = 'btn btn-outline';
+        if (newBtn) newBtn.style.display = '';
+        await loadAdminIncomingDocs();
+      } else {
+        if (incBtn) incBtn.className = 'btn btn-outline';
+        if (outBtn) outBtn.className = 'btn btn-success';
+        if (newBtn) newBtn.style.display = 'none';
+      }
+    }catch(e){ alert('Evrak Modülü yüklenemedi: ' + (e?.message||String(e))); }
+  }
+
+  async function loadAdminIncomingDocs(){
+    const tbody = document.getElementById('incomingDocsTableBody'); if (!tbody) return; tbody.innerHTML = '';
+    try{
+      const table = tbody.closest('table');
+      const headRow = table && table.tHead && table.tHead.rows && table.tHead.rows[0];
+      if (headRow){
+        headRow.innerHTML = '<th>Kayıt Sıra No</th><th>Geldiği Kişi/Kurum</th><th>Tarihi</th><th>Sayısı</th><th>Eki</th><th>Konusu</th><th>Muhafaza Dosya No</th><th>Dosya</th>';
+      }
+    }catch{}
+    try{
+      const { data, error } = await sb().from('incoming_docs')
+        .select('id, record_no, from_org, date, number, attachment, subject, file_no, file_url, created_at')
+        .order('date', { ascending:false, nullsFirst:true })
+        .order('created_at', { ascending:false, nullsFirst:true });
+      if (error) throw error;
+      incomingDocsById.clear();
+      (data||[]).forEach(row => {
+        incomingDocsById.set(String(row.id), row);
+        const tr = document.createElement('tr');
+        const fileLink = row.file_url
+          ? `<a href="#" data-preview-url="${escapeHtml(row.file_url)}" aria-label="Önizleme" title="Önizleme" style="display:inline-flex;align-items:center;gap:4px;">
+               <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                 <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path>
+                 <circle cx="12" cy="12" r="3"></circle>
+               </svg>
+             </a>`
+          : '-';
+        tr.innerHTML = `
+          <td>${escapeHtml(row.record_no||'')}</td>
+          <td>${escapeHtml(row.from_org||'')}</td>
+          <td>${row.date ? new Date(row.date).toLocaleDateString('tr-TR') : '-'}</td>
+          <td>${escapeHtml(row.number||'')}</td>
+          <td>${escapeHtml(row.attachment||'')}</td>
+          <td>${escapeHtml(row.subject||'')}</td>
+          <td>${escapeHtml(row.file_no||'')}</td>
+          <td>${fileLink}</td>`;
+        tbody.appendChild(tr);
+      });
+      // Wire preview clicks
+      try{
+        tbody.querySelectorAll('a[data-preview-url]').forEach(a => {
+          if (a.dataset.wired) return; a.dataset.wired='1';
+          a.addEventListener('click', (e)=>{ e.preventDefault(); const u=a.getAttribute('data-preview-url'); if (u) openDocPreviewModal(u); });
+        });
+      }catch{}
+    }catch(e){ alert('Gelen evraklar yüklenemedi: ' + (e?.message||String(e))); }
+  }
+
+  function wireIncomingDocsRowActions(){
+    const tbody = document.getElementById('incomingDocsTableBody'); if (!tbody) return;
+    try{
+      tbody.querySelectorAll('button[data-edit-incoming]').forEach(btn=>{
+        if (btn.dataset.wired) return; btn.dataset.wired='1';
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-edit-incoming');
+          const row = incomingDocsById.get(String(id));
+          await openIncomingDocModal(row||null);
+        });
+      });
+      tbody.querySelectorAll('button[data-del-incoming]').forEach(btn=>{
+        if (btn.dataset.wired) return; btn.dataset.wired='1';
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-del-incoming');
+          if (!id) return;
+          if (!confirm('Bu evrağı silmek istediğinize emin misiniz?')) return;
+          try{ await sb().from('incoming_docs').delete().eq('id', id); }
+          catch(e){ return alert('Silinemedi: ' + (e?.message||String(e))); }
+          try{ await loadAdminIncomingDocs(); }catch{}
+        });
+      });
+    }catch{}
+  }
+
+  async function openDocPreviewModal(url){
+    try{
+      $modalTitle().textContent = 'Dosya Önizleme';
+      const form = $modalForm(); form.innerHTML = '';
+      const wrap = document.createElement('div'); wrap.style.display='grid'; wrap.style.gap='8px';
+      const loading = document.createElement('div'); loading.textContent='Yükleniyor...'; loading.className='muted'; wrap.appendChild(loading);
+      form.appendChild(wrap);
+      (typeof openModal === 'function' ? openModal() : (window.openModal && window.openModal()));
+
+      const ext = (url.split('?')[0].split('#')[0].split('.').pop()||'').toLowerCase();
+      const imgExt = new Set(['jpg','jpeg','png','gif','bmp','webp','svg']);
+      const officeExt = new Set(['doc','docx','docm','dot','dotx','xls','xlsx','xlsm','xlsb','ppt','pptx','pptm','pps','ppsx','odt','rtf']);
+      let addedActions = false;
+
+      const buildOfficeFallback = () => {
+        try{ wrap.removeChild(loading); }catch{}
+        const info = document.createElement('div'); info.className='muted'; info.textContent='Bu dosya türü modalde önizlenmiyor. Aşağıdan yeni sekmede açabilir veya indirebilirsiniz.'; wrap.appendChild(info);
+        const actions = document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
+        const viewerUrl = 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url);
+        const openNew = document.createElement('a'); openNew.href=viewerUrl; openNew.target='_blank'; openNew.rel='noopener'; openNew.textContent='Yeni sekmede aç'; openNew.className='btn btn-outline'; actions.appendChild(openNew);
+        const dlBtn = document.createElement('button'); dlBtn.type='button'; dlBtn.className='btn btn-success'; dlBtn.textContent='İndir'; actions.appendChild(dlBtn);
+        const filename = () => {
+          try{ const p = new URL(url).pathname; const seg = p.split('/').filter(Boolean).pop()||'dosya'; return decodeURIComponent(seg); }catch{ return 'dosya'; }
+        };
+        dlBtn.addEventListener('click', async ()=>{
+          try{
+            dlBtn.disabled = true; dlBtn.textContent='İndiriliyor...';
+            const resp = await fetch(url, { credentials:'omit' }); if (!resp.ok) throw new Error('Dosya indirilemedi');
+            const blob = await resp.blob(); const oUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href=oUrl; a.download=filename(); document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(()=>{ try{ URL.revokeObjectURL(oUrl); }catch{} }, 60_000);
+            dlBtn.textContent='İndir'; dlBtn.disabled=false;
+          }catch(e){ alert('İndirme başarısız: ' + (e?.message||String(e))); dlBtn.textContent='İndir'; dlBtn.disabled=false; }
+        });
+        wrap.appendChild(actions);
+        addedActions = true;
+      };
+
+      // Direct load for images (no need to blob)
+      if (imgExt.has(ext)){
+        wrap.removeChild(loading);
+        const img = document.createElement('img'); img.src = url; img.alt = 'Önizleme'; img.style.maxWidth='100%'; img.style.maxHeight='75vh'; img.style.objectFit='contain'; wrap.appendChild(img);
+      } else if (officeExt.has(ext)){
+        // Standardize office files: only open in new tab or download
+        buildOfficeFallback();
+      } else {
+        let blobUrl = null;
+        try{
+          const resp = await fetch(url, { credentials: 'omit' });
+          if (!resp.ok) throw new Error('Önizleme için dosya alınamadı');
+          const ct = String(resp.headers.get('content-type')||'').toLowerCase();
+          const blob = await resp.blob();
+          blobUrl = URL.createObjectURL(blob);
+          wrap.removeChild(loading);
+          if (ct.includes('pdf') || ext === 'pdf'){
+            const embed = document.createElement('embed');
+            embed.type='application/pdf';
+            embed.src = blobUrl;
+            embed.style.width='100%'; embed.style.height='75vh';
+            wrap.appendChild(embed);
+          } else if (ct.includes('word') || ct.includes('officedocument') || ct.includes('msword') || ct.includes('powerpoint') || ct.includes('excel') || ct.includes('rtf') || ct.includes('opendocument')){
+            // Detected office content type after fetch -> show standardized actions, no inline preview
+            try{ URL.revokeObjectURL(blobUrl); }catch{} blobUrl=null;
+            buildOfficeFallback();
+          } else if (ct.startsWith('image/')){
+            const img = document.createElement('img'); img.src = blobUrl; img.alt = 'Önizleme'; img.style.maxWidth='100%'; img.style.maxHeight='75vh'; img.style.objectFit='contain'; wrap.appendChild(img);
+          } else if (ct.startsWith('text/') || ct.includes('html')){
+            const frame = document.createElement('iframe'); frame.src = blobUrl; frame.style.width='100%'; frame.style.height='75vh'; frame.setAttribute('title','Önizleme'); frame.setAttribute('loading','eager'); wrap.appendChild(frame);
+          } else {
+            try{ URL.revokeObjectURL(blobUrl); }catch{} blobUrl=null;
+            buildOfficeFallback();
+          }
+          // Revoke later to free memory
+          setTimeout(()=>{ try{ blobUrl && URL.revokeObjectURL(blobUrl); }catch{} }, 60_000);
+        }catch(err){
+          try{ wrap.removeChild(loading); }catch{}
+          const info = document.createElement('div'); info.className='muted'; info.textContent='Önizleme yerleşik pencerede açılamadı.'; wrap.appendChild(info);
+        }
+      }
+
+      // Fallback link
+      if (!addedActions){
+        const openNew = document.createElement('a'); openNew.href=url; openNew.target='_blank'; openNew.rel='noopener'; openNew.textContent='Yeni sekmede aç'; openNew.className='btn btn-outline';
+        wrap.appendChild(openNew);
+      }
+    }catch(e){ alert('Önizleme açılamadı: ' + (e?.message||String(e))); }
+  }
+
+  async function generateNextIncomingRecordNo(){
+    try{
+      const year = new Date().getFullYear();
+      const prefix = `${year}/`;
+      // Fetch last few for this year and compute max suffix
+      const { data } = await sb().from('incoming_docs')
+        .select('record_no')
+        .ilike('record_no', `${prefix}%`)
+        .order('record_no', { ascending:false })
+        .limit(1000);
+      let maxSeq = 0;
+      (data||[]).forEach(r => {
+        const s = String(r.record_no||'');
+        if (s.startsWith(prefix)){
+          const tail = s.slice(prefix.length).replace(/[^0-9]/g,'');
+          const n = parseInt(tail||'0',10);
+          if (!isNaN(n) && n > maxSeq) maxSeq = n;
+        }
+      });
+      const next = maxSeq + 1;
+      const pad = String(next).padStart(3,'0');
+      return `${prefix}${pad}`;
+    }catch{ return `${new Date().getFullYear()}/001`; }
+  }
+
+  async function openIncomingDocModal(row){
+    try{
+      row = row || null;
+      const isEdit = !!(row && row.id);
+      $modalTitle().textContent = isEdit ? 'Gelen Evrak Düzenle' : 'Yeni Gelen Evrak';
+      const form = $modalForm(); form.innerHTML='';
+
+      // Fields
+      const recLbl = document.createElement('label'); recLbl.style.display='grid'; recLbl.style.gap='6px'; recLbl.innerHTML = '<span>Kayıt Sıra No</span>';
+      const recIn = document.createElement('input'); recIn.readOnly = true; recIn.disabled = true; recIn.value = row?.record_no || '';
+      recLbl.appendChild(recIn); form.appendChild(recLbl);
+
+      const fromLbl = document.createElement('label'); fromLbl.style.display='grid'; fromLbl.style.gap='6px'; fromLbl.innerHTML = '<span>Geldiği Kişi veya Kurum</span>';
+      const fromIn = document.createElement('input'); fromIn.value = row?.from_org || '';
+      fromLbl.appendChild(fromIn); form.appendChild(fromLbl);
+
+      const dateLbl = document.createElement('label'); dateLbl.style.display='grid'; dateLbl.style.gap='6px'; dateLbl.innerHTML = '<span>Tarihi</span>';
+      const dateIn = document.createElement('input'); dateIn.type='date'; dateIn.value = row?.date ? String(row.date).slice(0,10) : '';
+      dateLbl.appendChild(dateIn); form.appendChild(dateLbl);
+
+      const numLbl = document.createElement('label'); numLbl.style.display='grid'; numLbl.style.gap='6px'; numLbl.innerHTML = '<span>Sayısı</span>';
+      const numIn = document.createElement('input'); numIn.value = row?.number || '';
+      numLbl.appendChild(numIn); form.appendChild(numLbl);
+
+      const attLbl = document.createElement('label'); attLbl.style.display='grid'; attLbl.style.gap='6px'; attLbl.innerHTML = '<span>Eki</span>';
+      const attIn = document.createElement('input'); attIn.value = row?.attachment || '';
+      attLbl.appendChild(attIn); form.appendChild(attLbl);
+
+      const subLbl = document.createElement('label'); subLbl.style.display='grid'; subLbl.style.gap='6px'; subLbl.innerHTML = '<span>Konusu</span>';
+      const subIn = document.createElement('input'); subIn.value = row?.subject || '';
+      subLbl.appendChild(subIn); form.appendChild(subLbl);
+
+      const fileNoLbl = document.createElement('label'); fileNoLbl.style.display='grid'; fileNoLbl.style.gap='6px'; fileNoLbl.innerHTML = '<span>Muhafaz Edildiği Dosya No</span>';
+      const fileNoIn = document.createElement('input'); fileNoIn.value = row?.file_no || '';
+      fileNoLbl.appendChild(fileNoIn); form.appendChild(fileNoLbl);
+
+      const fileLbl = document.createElement('label'); fileLbl.style.display='grid'; fileLbl.style.gap='6px'; fileLbl.innerHTML = '<span>Dosya Ekle</span>';
+      const fileUrlIn = document.createElement('input'); fileUrlIn.placeholder='https://...'; fileUrlIn.value = row?.file_url || '';
+      const fileFile = document.createElement('input'); fileFile.type='file'; fileFile.accept='application/pdf,image/*,.doc,.docx';
+      const fileWrap = document.createElement('div'); fileWrap.style.display='grid'; fileWrap.style.gap='6px'; fileWrap.appendChild(fileUrlIn); fileWrap.appendChild(fileFile);
+      fileLbl.appendChild(fileWrap); form.appendChild(fileLbl);
+
+      const actions = document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
+      const saveBtn = document.createElement('button'); saveBtn.className='btn btn-success'; saveBtn.textContent='Kaydet';
+      const cancelBtn = document.createElement('button'); cancelBtn.className='btn btn-danger'; cancelBtn.textContent='İptal';
+      actions.appendChild(saveBtn); actions.appendChild(cancelBtn); form.appendChild(actions);
+
+      cancelBtn.addEventListener('click', (e)=>{ e.preventDefault(); closeModal(); });
+
+      // Initialize record number for new entries
+      if (!isEdit){
+        try{ recIn.value = await generateNextIncomingRecordNo(); }catch{ recIn.value = `${new Date().getFullYear()}/001`; }
+      }
+
+      saveBtn.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        try{
+          const record_no = String(recIn.value||'').trim();
+          if (!record_no) return alert('Kayıt Sıra No üretilemedi');
+          const from_org = String(fromIn.value||'').trim();
+          const date = dateIn.value ? new Date(dateIn.value).toISOString().slice(0,10) : null;
+          const number = String(numIn.value||'').trim();
+          const attachment = String(attIn.value||'').trim();
+          const subject = String(subIn.value||'').trim();
+          const file_no = String(fileNoIn.value||'').trim();
+          let file_url = String(fileUrlIn.value||'').trim();
+
+          // Upload file if chosen
+          const f = fileFile.files && fileFile.files[0];
+          if (f){
+            const ext = (f.name.split('.').pop()||'pdf').toLowerCase();
+            const safeKey = record_no.replace(/\//g,'_');
+            const key = `incoming/${new Date().getFullYear()}/${safeKey}_${Date.now()}.${ext}`;
+            try{ file_url = await uploadToBucketGeneric(f, 'docs', key); }
+            catch(err){ return alert('Dosya yüklenemedi: ' + (err?.message||String(err))); }
+          }
+
+          const payload = { record_no, from_org, date, number, attachment, subject, file_no, file_url };
+          let q;
+          if (isEdit){ q = sb().from('incoming_docs').update(payload).eq('id', row.id); }
+          else { q = sb().from('incoming_docs').insert(payload).select('id, record_no').single(); }
+          const { data, error } = await q; if (error) throw error;
+          closeModal(); await loadAdminIncomingDocs();
+        }catch(err){ alert('Kaydedilemedi: ' + (err?.message||String(err))); }
+      });
+
+      (typeof openModal === 'function' ? openModal() : (window.openModal && window.openModal()));
+    }catch(e){ alert('Evrak formu açılamadı: ' + (e?.message||String(e))); }
   }
 
   // ============ Login reCAPTCHA (Admin) ============
