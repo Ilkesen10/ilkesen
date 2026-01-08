@@ -8,6 +8,24 @@ export default {
       return last.includes('.');
     };
     
+    if (path === '/page.html') {
+      const target = new URL(url.origin + '/page');
+      url.searchParams.forEach((v, k) => target.searchParams.set(k, v));
+      return Response.redirect(target.toString(), 301);
+    }
+
+    if (path === '/lawyer-request' || path === '/lawyer-request/') {
+      const target = new URL(url.origin + '/avukatlik-talebi');
+      url.searchParams.forEach((v, k) => target.searchParams.set(k, v));
+      return Response.redirect(target.toString(), 301);
+    }
+
+    if (path === '/index') {
+      const target = new URL(url.origin + '/');
+      url.searchParams.forEach((v, k) => target.searchParams.set(k, v));
+      return Response.redirect(target.toString(), 301);
+    }
+    
     // Handle trailing slashes
     if (path !== '/' && path.endsWith('/')) {
       const newPath = path.slice(0, -1);
@@ -16,18 +34,18 @@ export default {
       }
       return Response.redirect(`${url.origin}${newPath}`, 301);
     }
-    
-    // Handle specific routes
-    const routes = {
-      '/contact': '/contact.html',
-      '/avukatlik-talebi': '/avukatlik-talebi.html',
-      '/gorusme-talebi': '/gorusme-talebi.html',
-      '/uyelik-basvurusu': '/uyelik-basvurusu.html',
-      '/news': '/news.html',
-    };
-    
-    if (routes[path]) {
-      return env.ASSETS.fetch(new Request(url.origin + routes[path] + url.search, request));
+
+    const staticBypass = new Set([
+      '/contact',
+      '/avukatlik-talebi',
+      '/gorusme-talebi',
+      '/uyelik-basvurusu',
+      '/news',
+      '/admin',
+      '/verify',
+    ]);
+    if (staticBypass.has(path)) {
+      return env.ASSETS.fetch(request);
     }
 
     if (isAsset(path)) {
