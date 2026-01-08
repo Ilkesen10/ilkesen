@@ -1,4 +1,12 @@
 /page.html            /page                     301
+/contact.html         /contact                  301
+/avukatlik-talebi.html /avukatlik-talebi        301
+/gorusme-talebi.html  /gorusme-talebi           301
+/uyelik-basvurusu.html /uyelik-basvurusu        301
+/news.html            /news                     301
+/admin.html           /admin                    301
+/verify.html          /verify                   301
+/:file.:ext           /:file.:ext               200
 /page/                /page                     301
 /index/               /                        301
 /index                /                        301
@@ -6,3 +14,15 @@
 /verify/              /verify                   301
 /page/:slug           /:slug                     301
 /page/:slug/          /:slug                     301
+
+/page                 /page                     200
+/admin                /admin                    200
+/verify               /verify                   200
+/contact              /contact                  200
+/avukatlik-talebi     /avukatlik-talebi         200
+/gorusme-talebi       /gorusme-talebi           200
+/uyelik-basvurusu     /uyelik-basvurusu         200
+/news                 /news                     200
+
+/:slug                /page?slug=:slug           200
+/:slug/               /page?slug=:slug           200

@@ -35,25 +35,13 @@ export default {
       return Response.redirect(`${url.origin}${newPath}`, 301);
     }
 
-    const staticBypass = new Set([
-      '/contact',
-      '/avukatlik-talebi',
-      '/gorusme-talebi',
-      '/uyelik-basvurusu',
-      '/news',
-      '/admin',
-      '/verify',
-    ]);
-    if (staticBypass.has(path)) {
-      return env.ASSETS.fetch(request);
-    }
-
     if (isAsset(path)) {
       return env.ASSETS.fetch(request);
     }
 
-    if (path === '/page') {
-      return env.ASSETS.fetch(request);
+    const assetRes = await env.ASSETS.fetch(request);
+    if (assetRes.status !== 404) {
+      return assetRes;
     }
     
     // Handle dynamic pages
@@ -75,6 +63,6 @@ export default {
     }
     
     // Default to Assets
-    return env.ASSETS.fetch(request);
+    return assetRes;
   }
 };
