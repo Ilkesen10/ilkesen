@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" id="csp-meta" content="default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://www.gstatic.com; img-src 'self' data: https://www.google.com https://www.gstatic.com https://*.supabase.co blob:; font-src 'self' data:; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-src https://www.google.com https://www.gstatic.com; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" id="csp-meta" content="default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://www.gstatic.com; img-src 'self' data: https://www.google.com https://www.gstatic.com https://*.supabase.co blob:; font-src 'self' data:; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-src https://www.google.com https://www.gstatic.com; base-uri 'self'; form-action 'self'" />
   <script>
     (function(){
       try{
@@ -25,7 +25,7 @@
   <script src="supabase-config.js"></script>
   <script src="safe-images.js"></script>
   <script defer src="safe-images-dom.js"></script>
-  <script defer src="app.js"></script>
+  <script defer src="app.js?v=20260109-01"></script>
   <style>
     .contact-form label > span{font-weight:700}
   </style>
@@ -60,7 +60,7 @@
           <li class="has-sub"><a href="#">Basın-Yayın</a>
             <ul class="submenu">
               <li><a href="/afis">Afiş</a></li>
-              <li><a href="/rapor">Rapor</a></li>
+              <li><a href="/formlar">Formlar</a></li>
             </ul>
           </li>
           <li class="has-sub"><a href="#">Mevzuat</a>
@@ -217,10 +217,13 @@
             <span>Belgeler (opsiyonel)</span>
             <input type="file" name="documents" multiple />
           </label>
-          <label class="captcha-fallback" id="kvkkLabel">
-            <input type="checkbox" name="kvkk" id="kvkkAgree" required />
-            KVKK <a class="link-underline" id="kvkkDisclosureLink" href="#">Aydınlatma Metni</a>'ni okudum.
-          </label>
+          <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+            <label class="captcha-fallback" id="kvkkLabel" style="margin:0">
+              <input type="checkbox" name="kvkk" id="kvkkAgree" required />
+              KVKK <a class="link-underline" id="kvkkDisclosureLink" href="#">Aydınlatma Metni</a>'ni okudum.
+            </label>
+            <button id="membershipPdfDownload" class="btn btn-outline" type="button">Form İndir</button>
+          </div>
           <div class="captcha-wrap">
             <div id="recaptcha-container"></div>
             <label class="captcha-fallback" id="captchaFallback" hidden>

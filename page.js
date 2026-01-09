@@ -219,11 +219,17 @@
 
   async function loadPage(){
     try{
-      if (!await waitForSupabase(1500)){ qs('#pageTitle').textContent = 'Yapılandırma bulunamadı'; return; }
       if (!slug){
         qs('#pageTitle').textContent = 'Sayfa bulunamadı';
         return;
       }
+
+      if (slug === 'formlar'){
+        await renderForms();
+        return;
+      }
+
+      if (!await waitForSupabase(1500)){ qs('#pageTitle').textContent = 'Yapılandırma bulunamadı'; return; }
       // Special pages under Basın-Yayın
       if (slug === 'afis'){
         await renderPosters();
@@ -440,6 +446,123 @@
       root.appendChild(ul);
       buildToc();
     }catch(e){ qs('#pageTitle').textContent='Raporlar yüklenemedi'; console.error(e); }
+  }
+
+  async function renderForms(){
+    try{
+      document.title = 'Formlar | İlke Sendika';
+      qs('#pageTitle').textContent = 'Formlar';
+      const metaEl = qs('#pageMeta'); if (metaEl) metaEl.hidden = true;
+
+      if (!document.getElementById('formsStyles')){
+        const st = document.createElement('style'); st.id = 'formsStyles'; st.textContent = `
+          #pageBody.forms{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; align-items:start; }
+          @media (max-width: 980px){ #pageBody.forms{ grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+          @media (max-width: 640px){ #pageBody.forms{ grid-template-columns:1fr; } }
+          .form-card{ padding:14px; }
+          .form-card h3{ margin:0 0 10px; font-size:16px; }
+          .pdf-preview{ width:100%; border:1px solid rgba(0,0,0,.08); border-radius:12px; overflow:hidden; background:#fff; }
+          .pdf-preview embed{ width:100%; height:420px; display:block; }
+          @media (max-width: 640px){ .pdf-preview embed{ height:520px; } }
+          .form-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+        `;
+        document.head.appendChild(st);
+      }
+
+      const items = [
+        { title: 'Üyelik Formu', file: 'assets/üyelik.pdf' },
+        { title: 'Üyelikten Ayrılma Formu', file: 'assets/ayrilma.pdf' },
+        { title: 'Antetli Kağıt', file: 'assets/antet.pdf' },
+      ];
+
+      const root = qs('#pageBody');
+      root.innerHTML='';
+      root.classList.remove('cards');
+      root.classList.add('forms');
+
+      try{
+        if (!window.__formsCleanupWired){
+          window.__formsCleanupWired = true;
+          window.__formsBlobUrls = window.__formsBlobUrls || [];
+          window.addEventListener('beforeunload', ()=>{
+            try{
+              (window.__formsBlobUrls||[]).forEach(u=>{ try{ URL.revokeObjectURL(u); }catch{} });
+              window.__formsBlobUrls = [];
+            }catch{}
+          });
+        }
+      }catch{}
+
+      items.forEach(item => {
+        const url = '/' + encodeURI(String(item.file||'').replace(/^\/+/, ''));
+        const card = document.createElement('article');
+        card.className = 'card form-card';
+
+        const h = document.createElement('h3'); h.textContent = item.title || 'Form';
+        card.appendChild(h);
+
+        const preview = document.createElement('div');
+        preview.className = 'pdf-preview';
+        const loading = document.createElement('div');
+        loading.className = 'muted';
+        loading.style.padding = '12px';
+        loading.textContent = 'Önizleme yükleniyor...';
+        preview.appendChild(loading);
+        const emb = document.createElement('embed');
+        emb.type = 'application/pdf';
+        card.appendChild(preview);
+
+        (async ()=>{
+          try{
+            const resp = await fetch(url, { credentials:'omit' });
+            if (!resp.ok) throw new Error('Dosya alınamadı');
+            const ct = String(resp.headers.get('content-type')||'').toLowerCase();
+            let blob = await resp.blob();
+            // Some hosts serve PDFs with a generic content-type; with nosniff this can break preview.
+            // Force PDF MIME for the in-page viewer.
+            try{
+              if (!ct.includes('pdf') && String(blob.type||'').toLowerCase() !== 'application/pdf'){
+                blob = new Blob([blob], { type: 'application/pdf' });
+              }
+            }catch{}
+            const objUrl = URL.createObjectURL(blob);
+            try{ window.__formsBlobUrls = window.__formsBlobUrls || []; window.__formsBlobUrls.push(objUrl); }catch{}
+            emb.src = objUrl;
+            preview.innerHTML = '';
+            preview.appendChild(emb);
+          }catch(e){
+            try{ loading.textContent = 'Önizleme gösterilemiyor.'; }catch{}
+          }
+        })();
+
+        const actions = document.createElement('div');
+        actions.className = 'form-actions';
+
+        const dl = document.createElement('a');
+        dl.className = 'btn btn-primary';
+        dl.href = url;
+        dl.setAttribute('download', item.title ? (item.title + '.pdf') : 'form.pdf');
+        dl.textContent = 'İndir';
+
+        const open = document.createElement('a');
+        open.className = 'btn btn-outline';
+        open.href = url;
+        open.target = '_blank';
+        open.rel = 'noopener';
+        open.textContent = 'Yeni sekmede aç';
+
+        actions.appendChild(dl);
+        actions.appendChild(open);
+        card.appendChild(actions);
+
+        root.appendChild(card);
+      });
+
+      buildToc();
+    }catch(e){
+      qs('#pageTitle').textContent = 'Formlar yüklenemedi';
+      console.error(e);
+    }
   }
 
   // Render Kurucular: 7 founders in 1–3–3 layout

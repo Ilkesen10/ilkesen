@@ -175,6 +175,425 @@ window.IlkeSendika = (function(){
     }catch(e){ console.warn('initMembershipFormInputFilters error:', e); }
   }
 
+  async function ensurePdfLib(){
+    try{
+      if (window.PDFLib && window.PDFLib.PDFDocument) return window.PDFLib;
+      if (window.pdfLib && window.pdfLib.PDFDocument) return window.pdfLib;
+      if (document.querySelector('script[data-pdf-lib]')){
+        for (let i=0;i<10;i++){
+          await new Promise(r=> setTimeout(r, 150));
+          if (window.PDFLib?.PDFDocument || window.pdfLib?.PDFDocument) return window.PDFLib || window.pdfLib;
+        }
+      }
+      const s = document.createElement('script');
+      s.src = 'vendor/pdf-lib/pdf-lib.min.js';
+      s.async = true; s.defer = true;
+      s.setAttribute('data-pdf-lib','1');
+      const p = new Promise((resolve)=>{ s.onload=()=> resolve(window.PDFLib || window.pdfLib || null); s.onerror=()=> resolve(null); });
+      document.head.appendChild(s);
+      const mod = await p;
+      if (mod && mod.PDFDocument) return mod;
+    }catch{}
+    return null;
+  }
+
+  async function ensureFontkit(){
+    try{
+      if (window.fontkit) return window.fontkit;
+      if (document.querySelector('script[data-fontkit]')){
+        for (let i=0;i<10;i++){
+          await new Promise(r=> setTimeout(r, 150));
+          if (window.fontkit) return window.fontkit;
+        }
+      }
+      const s = document.createElement('script');
+      s.src = 'vendor/fontkit/fontkit.umd.min.js';
+      s.async = true; s.defer = true;
+      s.setAttribute('data-fontkit','1');
+      const p = new Promise((resolve)=>{ s.onload=()=> resolve(window.fontkit || null); s.onerror=()=> resolve(null); });
+      document.head.appendChild(s);
+      return await p;
+    }catch{}
+    return null;
+  }
+
+  function readMembershipFormForPdf(){
+    const form = document.getElementById('membershipForm');
+    if (!form) return null;
+    const fd = new FormData(form);
+    const upperTR = (s)=>{ try{ return String(s||'').toLocaleUpperCase('tr-TR'); }catch{ return String(s||'').toUpperCase(); } };
+    const letters = (s)=> String(s||'').replace(/[^A-Za-zÇĞİÖŞÜçğıöşü\s]/g,' ').replace(/\s+/g,' ').trim();
+    const digits = (s, maxLen)=>{ let v=String(s||'').replace(/\D/g,''); return (maxLen? v.slice(0,maxLen): v); };
+
+    const provSel = form.querySelector('select[name="work_province"]');
+    const distSel = form.querySelector('select[name="work_district"]');
+    const provOpt = provSel && provSel.selectedOptions ? provSel.selectedOptions[0] : null;
+    const distOpt = distSel && distSel.selectedOptions ? distSel.selectedOptions[0] : null;
+
+    const member = {
+      first_name: upperTR(letters(fd.get('first_name'))),
+      last_name: upperTR(letters(fd.get('last_name'))),
+      national_id: digits(fd.get('national_id'), 11),
+      father_name: upperTR(letters(fd.get('father_name'))),
+      mother_name: upperTR(letters(fd.get('mother_name'))),
+      birth_place: upperTR(letters(fd.get('birth_place'))),
+      birth_date: String(fd.get('birth_date')||'').trim(),
+      gender: String(fd.get('gender')||'').trim(),
+      education: String(fd.get('education')||'').trim(),
+      institution_name: upperTR(letters(fd.get('institution_name'))),
+      work_unit: upperTR(letters(fd.get('work_unit'))),
+      work_unit_address: String(fd.get('work_unit_address')||'').trim(),
+      corp_reg_no: digits(fd.get('corp_reg_no')),
+      title: upperTR(letters(fd.get('title'))),
+      retirement_no: digits(fd.get('retirement_no')),
+      ssk_no: digits(fd.get('ssk_no')),
+      email: String(fd.get('email')||'').trim(),
+      phone: String(fd.get('phone')||'').trim(),
+      work_province: provOpt ? String(provOpt.textContent||'').trim() : '',
+      work_district: distOpt ? String(distOpt.textContent||'').trim() : '',
+      __plate_code: provOpt ? String(provOpt.dataset.plate||'').trim() : ''
+    };
+    return member;
+  }
+
+  async function generateMembershipFormPdfBlob(member){
+    const PDFLib = await ensurePdfLib();
+    if (!PDFLib || !PDFLib.PDFDocument) return null;
+    const { PDFDocument, StandardFonts } = PDFLib;
+    const fmtDate = (d)=>{ try{ if(!d) return ''; const parts=String(d).split('-'); if(parts.length===3){ return `${parts[2]}.${parts[1]}.${parts[0]}`; } return String(d);}catch{return String(d||'');} };
+    const plateCode = member.__plate_code || '';
+    const values = {
+      'KURUMUN ADI': member.institution_name||'',
+      'GÖREV YAPILAN BİRİMİN ADI': member.work_unit||'',
+      'GÖREV YAPILAN BİRİMİN ADRESİ': member.work_unit_address||'',
+      'İL ADI': member.work_province||'',
+      'iL ADI': member.work_province||'',
+      'İL Kodu': plateCode||'',
+      'iL Kodu': plateCode||'',
+      'İLÇE ADI': member.work_district||'',
+      'ADI': member.first_name||'',
+      'SOYADI': member.last_name||'',
+      'TC KİMLİK NO': member.national_id||'',
+      'BABA ADI': member.father_name||'',
+      'ANA ADI': member.mother_name||'',
+      'DOĞUM TARİHİ': fmtDate(member.birth_date),
+      'DOĞUM YERİ': member.birth_place||'',
+      'CİNSİYETİ': member.gender||'',
+      'ÖĞRENİM': member.education||'',
+      'KURUM SİCİL': member.corp_reg_no||'',
+      'KADRO ÜNVANI': member.title||'',
+      'T.C.EMEKLİ SANDIĞI': member.retirement_no||'',
+      'SOSYAL SİGORTALAR KURUMU': member.ssk_no||'',
+      'E-POSTA': member.email||'',
+      'CEP TEL': member.phone||'',
+    };
+    async function fetchTpl(){
+      const urls = ['assets/üyelik.pdf', 'assets/%C3%BCyelik.pdf', 'assets/uyelik.pdf'];
+      for (const u of urls){
+        try{ const r = await fetch(u, { cache:'no-store' }); if (r.ok) return await r.arrayBuffer(); }catch{}
+      }
+      throw new Error('Şablon PDF yüklenemedi');
+    }
+    const tplBytes = await fetchTpl();
+    const pdfDoc = await PDFDocument.load(tplBytes);
+
+    let customFont = null;
+    try{
+      await ensureFontkit();
+      if (window.fontkit && pdfDoc.registerFontkit) { pdfDoc.registerFontkit(window.fontkit); }
+      const fontResp = await fetch('assets/fonts/Roboto-Regular.ttf');
+      if (fontResp.ok){
+        const fontBytes = await fontResp.arrayBuffer();
+        customFont = await pdfDoc.embedFont(fontBytes);
+      }
+    }catch{}
+
+    let form = null;
+    try{ form = pdfDoc.getForm(); }catch{}
+    let fields = [];
+    try{ fields = form && form.getFields ? (form.getFields()||[]) : []; }catch{}
+
+    const CM_TO_PT = 28.346456692913385;
+    const shiftKeys = new Set(['kurum_adi','gorev_birim_adi','gorev_birim_adresi','adi','soyadi','tc','baba','ana','dogum_tarihi','dogum_yeri','kurum_sicil','unvan','sgk_sicil']);
+    const shiftLabels = new Set(['KURUMUN ADI','GÖREV YAPILAN BİRİMİN ADI','GÖREV YAPILAN BİRİMİN ADRESİ','ADI','SOYADI','TC KİMLİK NO','BABA ADI','ANA ADI','DOĞUM TARİHİ','DOĞUM YERİ','KURUM SİCİL','KADRO ÜNVANI','T.C.EMEKLİ SANDIĞI','SOSYAL SİGORTALAR KURUMU']);
+    const overlayValuesByKey = {
+      kurum_adi: values['KURUMUN ADI'],
+      gorev_birim_adi: values['GÖREV YAPILAN BİRİMİN ADI'],
+      gorev_birim_adresi: values['GÖREV YAPILAN BİRİMİN ADRESİ'],
+      adi: values['ADI'],
+      soyadi: values['SOYADI'],
+      tc: values['TC KİMLİK NO'],
+      baba: values['BABA ADI'],
+      ana: values['ANA ADI'],
+      dogum_tarihi: values['DOĞUM TARİHİ'],
+      dogum_yeri: values['DOĞUM YERİ'],
+      kurum_sicil: values['KURUM SİCİL'],
+      unvan: values['KADRO ÜNVANI'],
+      sgk_sicil: (member.retirement_no || member.ssk_no || '')
+    };
+
+    async function drawShiftedOverlay(){
+      try{
+        const pages = pdfDoc.getPages();
+        const page = pages[0];
+        const { width, height } = page.getSize();
+        const drawerFont = customFont || await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const defaultCoords = {
+          kurum_adi:{x:0.32115696712360275,y:0.3054318129533846},
+          gorev_birim_adi:{x:0.3192376374534848,y:0.35759530361587766},
+          gorev_birim_adresi:{x:0.3192376374534848,y:0.38400000000000006},
+          il_adi:{x:0.32691495613395666,y:0.5119992359768569},
+          il_kodu:{x:0.6800716154356627,y:0.5099126963503573},
+          ilce_adi:{x:0.8182633516841563,y:0.5099126963503573},
+          adi:{x:0.3000443407523052,y:0.6010249532392351},
+          soyadi:{x:0.29812501108218714,y:0.6364961268897303},
+          tc:{x:0.2942863517419513,y:0.6858775676187977},
+          baba:{x:0.2962056814120692,y:0.7195404103920329},
+          ana:{x:0.726135527518494,y:0.7216269500185325},
+          dogum_tarihi:{x:0.2942863517419513,y:0.7612712029220272},
+          dogum_yeri:{x:0.7338128461989657,y:0.7612712029220272},
+          kurum_sicil:{x:0.3000443407523052,y:0.8669892212773691},
+          unvan:{x:0.3019636704224231,y:0.9042687175968724},
+          eposta:{x:0.6570396593942471,y:0.8468193276085157},
+          cep:{x:0.20983584625676072,y:0.882290501259011},
+          sgk_sicil:{x:0.2040778572464068,y:0.8452892059779652},
+          cinsiyet_erkek:{x:0.4977352967744557,y:0.1732843298067924},
+          cinsiyet_kadin:{x:0.8643272637669875,y:0.17537086943329214},
+          ogrenim_ilkogretim:{x:0.37489819788690587,y:0.21292858271028706},
+          ogrenim_lise:{x:0.5860244615998822,y:0.2150151223367868},
+          ogrenim_yuksekokul:{x:0.9161491648601727,y:0.2150151223367868}
+        };
+        const defaultStyles = {
+          kurum_adi:{dx:-0.006000000000000001,dy:-0.05500000000000001,size:9.5},
+          gorev_birim_adi:{dx:-0.003,dy:-0.07900000000000003,size:9.5},
+          gorev_birim_adresi:{dx:-0.003,dy:-0.07200000000000003,size:9.5},
+          il_adi:{dx:0.07500000000000002,dy:-0.14500000000000007,size:9.5},
+          il_kodu:{dx:-0.026999999999999996,dy:-0.14200000000000007,size:9.5},
+          ilce_adi:{dx:-0.042,dy:-0.14200000000000007,size:9.5},
+          adi:{dx:0.012,dy:-0.1780000000000001,size:9.5},
+          soyadi:{dx:0.012,dy:-0.19300000000000012,size:9.5},
+          tc:{dx:0.015,dy:-0.21700000000000014,size:9.5},
+          baba:{dx:0.015,dy:-0.22600000000000015,size:9.5},
+          ana:{dx:-0.018,dy:-0.22900000000000015,size:9.5},
+          dogum_tarihi:{dx:0.018,dy:-0.24700000000000016,size:9.5},
+          dogum_yeri:{dx:-0.026999999999999996,dy:-0.24700000000000016,size:9.5},
+          kurum_sicil:{dx:0.012,dy:-0.2890000000000002,size:9.5},
+          unvan:{dx:0.009000000000000001,dy:-0.3070000000000002,size:9.5},
+          eposta:{dx:-0.045000000000000005,dy:-0.12100000000000005,size:9.5},
+          cep:{dx:0,dy:-0.13300000000000006,size:9.5},
+          sgk_sicil:{dx:0.24900000000000017,dy:-0.19300000000000012,size:9.5},
+          cinsiyet_erkek:{dx:-0.008999999999999994,dy:0.3630000000000002,size:10.5},
+          cinsiyet_kadin:{dx:-0.05400000000000001,dy:0.36000000000000026,size:10},
+          ogrenim_ilkogretim:{dx:0.003,dy:0.34500000000000025,size:10},
+          ogrenim_lise:{dx:-0.020999999999999998,dy:0.34200000000000025,size:10},
+          ogrenim_yuksekokul:{dx:-0.06000000000000002,dy:0.3420000000000002,size:10}
+        };
+        let coords = JSON.parse(JSON.stringify(defaultCoords));
+        try{ const raw = localStorage.getItem('ilkesen_pdf_coords_v1'); if (raw){ const m = JSON.parse(raw)||{}; Object.assign(coords, m); } }catch{}
+        let styles = JSON.parse(JSON.stringify(defaultStyles));
+        try{ const raw = localStorage.getItem('ilkesen_pdf_styles_v1'); if (raw){ const m = JSON.parse(raw)||{}; Object.assign(styles, m); } }catch{}
+
+        function drawTxt(key, text){
+          const c = coords[key]; if (!c) return; const st = styles[key]||{};
+          const dx = Number.isFinite(st.dx) ? st.dx : 0; const dy = Number.isFinite(st.dy) ? st.dy : 0; const fs = Number.isFinite(st.size) ? st.size : 10;
+          let tx = (c.x + dx) * width;
+          if (shiftKeys.has(key)) tx = tx - CM_TO_PT;
+          tx = Math.max(8, tx);
+          const ty = Math.max(8, height - ((c.y + dy) * height));
+          page.drawText(String(text||''), { x: tx, y: ty, size: fs, font: drawerFont });
+        }
+        function markX(key, sz){
+          const c = coords[key]; if (!c) return; const st = styles[key]||{};
+          const dx = Number.isFinite(st.dx) ? st.dx : 0; const dy = Number.isFinite(st.dy) ? st.dy : 0; const fs = Number.isFinite(st.size) ? st.size : (sz||12);
+          const tx = Math.max(6, (c.x + dx) * width);
+          const ty = Math.max(6, height - ((c.y + dy) * height));
+          page.drawText('X', { x: tx, y: ty, size: fs, font: drawerFont });
+        }
+        Object.entries(overlayValuesByKey).forEach(([k,v])=>{ try{ drawTxt(k, v); }catch{} });
+
+        let gk = '';
+        try{
+          const g = String(member.gender||'').toLowerCase();
+          if (g.includes('erk') || g==='male') gk = 'cinsiyet_erkek';
+          else if (g.includes('kad') || g==='female') gk = 'cinsiyet_kadin';
+        }catch{}
+        if (gk) markX(gk);
+
+        function eduKey(v){
+          const s = String(v||'').toLowerCase();
+          if (!s) return '';
+          if (s.includes('ilkö') || s.includes('ilko') || s.includes('ilkokul') || s.includes('ortaokul') || s.includes('ortaok') || s.includes('primary') || s.includes('middle')) return 'ogrenim_ilkogretim';
+          if (s.includes('lise') || s.includes('high')) return 'ogrenim_lise';
+          if (s.includes('yüksek') || s.includes('yuksek') || s.includes('univers') || s.includes('ünivers') || s.includes('uni') || s.includes('yuksekokul') || s.includes('yüksekokul') || s.includes('lisans') || s.includes('onlisans') || s.includes('önlisans') || s.includes('doktora') || s.includes('doctor')) return 'ogrenim_yuksekokul';
+          return '';
+        }
+        const ek = eduKey(member.education);
+        if (ek) markX(ek);
+      }catch{}
+    }
+
+    if (form && fields && fields.length){
+      try{
+        const norm = (s)=> String(s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9ÇĞİÖŞÜçğıöşü]/g,'').toLocaleUpperCase('tr-TR');
+        const catalog = (fields||[]).map(f=>({ n: norm(f.getName()), name: f.getName() }));
+        function setFieldSmart(label, val){
+          const v = String(val ?? '');
+          try{ const tf = form.getTextField(label); tf.setText(v); return true; }catch{}
+          const key = norm(label);
+          let hit = catalog.find(c=> c.n === key);
+          if (hit){ try{ form.getTextField(hit.name).setText(v); return true; }catch{} }
+          hit = catalog.find(c=> c.n.includes(key) || key.includes(c.n));
+          if (hit){ try{ form.getTextField(hit.name).setText(v); return true; }catch{} }
+          return false;
+        }
+        Object.entries(values).forEach(([k,v])=>{ try{ if (!shiftLabels.has(k)) setFieldSmart(k, v); }catch{} });
+        try{
+          if (customFont){ form.updateFieldAppearances(customFont); }
+          else { const helv = await pdfDoc.embedFont(StandardFonts.Helvetica); form.updateFieldAppearances(helv); }
+        }catch{}
+        try{ form.flatten(); }catch{}
+        await drawShiftedOverlay();
+      }catch{}
+    } else {
+      const pages = pdfDoc.getPages();
+      const page = pages[0];
+      const { width, height } = page.getSize();
+      const drawerFont = customFont || await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const defaultCoords = {
+        kurum_adi:{x:0.32115696712360275,y:0.3054318129533846},
+        gorev_birim_adi:{x:0.3192376374534848,y:0.35759530361587766},
+        gorev_birim_adresi:{x:0.3192376374534848,y:0.38400000000000006},
+        il_adi:{x:0.32691495613395666,y:0.5119992359768569},
+        il_kodu:{x:0.6800716154356627,y:0.5099126963503573},
+        ilce_adi:{x:0.8182633516841563,y:0.5099126963503573},
+        adi:{x:0.3000443407523052,y:0.6010249532392351},
+        soyadi:{x:0.29812501108218714,y:0.6364961268897303},
+        tc:{x:0.2942863517419513,y:0.6858775676187977},
+        baba:{x:0.2962056814120692,y:0.7195404103920329},
+        ana:{x:0.726135527518494,y:0.7216269500185325},
+        dogum_tarihi:{x:0.2942863517419513,y:0.7612712029220272},
+        dogum_yeri:{x:0.7338128461989657,y:0.7612712029220272},
+        kurum_sicil:{x:0.3000443407523052,y:0.8669892212773691},
+        unvan:{x:0.3019636704224231,y:0.9042687175968724},
+        eposta:{x:0.6570396593942471,y:0.8468193276085157},
+        cep:{x:0.20983584625676072,y:0.882290501259011},
+        sgk_sicil:{x:0.2040778572464068,y:0.8452892059779652},
+        cinsiyet_erkek:{x:0.4977352967744557,y:0.1732843298067924},
+        cinsiyet_kadin:{x:0.8643272637669875,y:0.17537086943329214},
+        ogrenim_ilkogretim:{x:0.37489819788690587,y:0.21292858271028706},
+        ogrenim_lise:{x:0.5860244615998822,y:0.2150151223367868},
+        ogrenim_yuksekokul:{x:0.9161491648601727,y:0.2150151223367868}
+      };
+      const defaultStyles = {
+        kurum_adi:{dx:-0.006000000000000001,dy:-0.05500000000000001,size:9.5},
+        gorev_birim_adi:{dx:-0.003,dy:-0.07900000000000003,size:9.5},
+        gorev_birim_adresi:{dx:-0.003,dy:-0.07200000000000003,size:9.5},
+        il_adi:{dx:0.07500000000000002,dy:-0.14500000000000007,size:9.5},
+        il_kodu:{dx:-0.026999999999999996,dy:-0.14200000000000007,size:9.5},
+        ilce_adi:{dx:-0.042,dy:-0.14200000000000007,size:9.5},
+        adi:{dx:0.012,dy:-0.1780000000000001,size:9.5},
+        soyadi:{dx:0.012,dy:-0.19300000000000012,size:9.5},
+        tc:{dx:0.015,dy:-0.21700000000000014,size:9.5},
+        baba:{dx:0.015,dy:-0.22600000000000015,size:9.5},
+        ana:{dx:-0.018,dy:-0.22900000000000015,size:9.5},
+        dogum_tarihi:{dx:0.018,dy:-0.24700000000000016,size:9.5},
+        dogum_yeri:{dx:-0.026999999999999996,dy:-0.24700000000000016,size:9.5},
+        kurum_sicil:{dx:0.012,dy:-0.2890000000000002,size:9.5},
+        unvan:{dx:0.009000000000000001,dy:-0.3070000000000002,size:9.5},
+        eposta:{dx:-0.045000000000000005,dy:-0.12100000000000005,size:9.5},
+        cep:{dx:0,dy:-0.13300000000000006,size:9.5},
+        sgk_sicil:{dx:0.24900000000000017,dy:-0.19300000000000012,size:9.5},
+        cinsiyet_erkek:{dx:-0.008999999999999994,dy:0.3630000000000002,size:10.5},
+        cinsiyet_kadin:{dx:-0.05400000000000001,dy:0.36000000000000026,size:10},
+        ogrenim_ilkogretim:{dx:0.003,dy:0.34500000000000025,size:10},
+        ogrenim_lise:{dx:-0.020999999999999998,dy:0.34200000000000025,size:10},
+        ogrenim_yuksekokul:{dx:-0.06000000000000002,dy:0.3420000000000002,size:10}
+      };
+      let coords = JSON.parse(JSON.stringify(defaultCoords));
+      try{ const raw = localStorage.getItem('ilkesen_pdf_coords_v1'); if (raw){ const m = JSON.parse(raw)||{}; Object.assign(coords, m); } }catch{}
+      let styles = JSON.parse(JSON.stringify(defaultStyles));
+      try{ const raw = localStorage.getItem('ilkesen_pdf_styles_v1'); if (raw){ const m = JSON.parse(raw)||{}; Object.assign(styles, m); } }catch{}
+
+      function drawTxt(key, text, sz){
+        const c = coords[key]; if (!c) return; const st = styles[key]||{};
+        const dx = Number.isFinite(st.dx) ? st.dx : 0; const dy = Number.isFinite(st.dy) ? st.dy : 0; const fs = Number.isFinite(st.size) ? st.size : (sz||10);
+        let tx = (c.x + dx) * width;
+        if (shiftKeys.has(key)) tx = tx - CM_TO_PT;
+        tx = Math.max(8, tx);
+        const ty = Math.max(8, height - ((c.y + dy) * height));
+        page.drawText(String(text||''), { x: tx, y: ty, size: fs, font: drawerFont });
+      }
+      function markX(key, sz){
+        const c = coords[key]; if (!c) return; const st = styles[key]||{};
+        const dx = Number.isFinite(st.dx) ? st.dx : 0; const dy = Number.isFinite(st.dy) ? st.dy : 0; const fs = Number.isFinite(st.size) ? st.size : (sz||12);
+        const tx = Math.max(6, (c.x + dx) * width);
+        const ty = Math.max(6, height - ((c.y + dy) * height));
+        page.drawText('X', { x: tx, y: ty, size: fs, font: drawerFont });
+      }
+
+      drawTxt('kurum_adi', values['KURUMUN ADI']);
+      drawTxt('gorev_birim_adi', values['GÖREV YAPILAN BİRİMİN ADI']);
+      drawTxt('gorev_birim_adresi', values['GÖREV YAPILAN BİRİMİN ADRESİ']);
+      drawTxt('il_adi', values['İL ADI']);
+      drawTxt('il_kodu', values['İL Kodu']);
+      drawTxt('ilce_adi', values['İLÇE ADI']);
+      drawTxt('adi', values['ADI']);
+      drawTxt('soyadi', values['SOYADI']);
+      drawTxt('tc', values['TC KİMLİK NO']);
+      drawTxt('baba', values['BABA ADI']);
+      drawTxt('ana', values['ANA ADI']);
+      drawTxt('dogum_tarihi', values['DOĞUM TARİHİ']);
+      drawTxt('dogum_yeri', values['DOĞUM YERİ']);
+      drawTxt('kurum_sicil', values['KURUM SİCİL']);
+      drawTxt('unvan', values['KADRO ÜNVANI']);
+      drawTxt('eposta', values['E-POSTA']);
+      drawTxt('cep', values['CEP TEL']);
+      const sgkNo = member.retirement_no || member.ssk_no || '';
+      drawTxt('sgk_sicil', sgkNo);
+
+      let gk = '';
+      try{
+        const g = String(member.gender||'').toLowerCase();
+        if (g.includes('erk') || g==='male') gk = 'cinsiyet_erkek';
+        else if (g.includes('kad') || g==='female') gk = 'cinsiyet_kadin';
+      }catch{}
+      if (gk) markX(gk);
+
+      function eduKey(v){
+        const s = String(v||'').toLowerCase();
+        if (!s) return '';
+        if (s.includes('ilkö') || s.includes('ilko') || s.includes('ilkokul') || s.includes('ortaokul') || s.includes('ortaok') || s.includes('primary') || s.includes('middle')) return 'ogrenim_ilkogretim';
+        if (s.includes('lise') || s.includes('high')) return 'ogrenim_lise';
+        if (s.includes('yüksek') || s.includes('yuksek') || s.includes('univers') || s.includes('ünivers') || s.includes('uni') || s.includes('yuksekokul') || s.includes('yüksekokul') || s.includes('lisans') || s.includes('onlisans') || s.includes('önlisans') || s.includes('doktora') || s.includes('doctor')) return 'ogrenim_yuksekokul';
+        return '';
+      }
+      const ek = eduKey(member.education);
+      if (ek) markX(ek);
+    }
+
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  }
+
+  async function handleMembershipPdfDownloadClick(){
+    try{
+      const member = readMembershipFormForPdf();
+      if (!member) return;
+      const blob = await generateMembershipFormPdfBlob(member);
+      if (!blob) { alert('PDF oluşturucu yüklenemedi. Lütfen sayfayı yenileyip tekrar deneyiniz.'); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const safeName = `${String(member?.first_name||'').trim()}_${String(member?.last_name||'').trim()}`.replace(/[^A-Za-z0-9_çğıöşüİıÇĞÖŞÜ-]/g,'_');
+      a.href = url;
+      a.download = `uyelik_formu_${safeName||member?.national_id||''}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{ try{ a.remove(); URL.revokeObjectURL(url); }catch{} }, 250);
+    }catch(e){
+      alert('Form indirilemedi: ' + (e?.message||String(e)));
+    }
+  }
+
   // Membership Application form handler
   api.handleMembershipApplySubmit = async function(e){
     e.preventDefault();
@@ -1154,6 +1573,15 @@ try{
         )){
           // Lawyer/Membership request pages: init geo selects (if membership) then recaptcha
           try{ if (document.body.getAttribute('data-page') === 'uyelik-basvurusu'){ initPublicGeoSelectors(); initMembershipFormInputFilters(); } }catch{}
+          try{
+            if (document.body.getAttribute('data-page') === 'uyelik-basvurusu'){
+              const btn = document.getElementById('membershipPdfDownload');
+              if (btn && !btn.__wired){
+                btn.__wired = true;
+                btn.addEventListener('click', handleMembershipPdfDownloadClick);
+              }
+            }
+          }catch{}
           try{
             const p = window.IlkeSendikaReload && window.IlkeSendikaReload.loadContactSettings ? window.IlkeSendikaReload.loadContactSettings() : null;
             if (p && typeof p.then === 'function'){

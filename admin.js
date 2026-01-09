@@ -307,6 +307,7 @@
   let currentMsgCategory = 'all';
   let currentDocsSubTab = 'incoming';
   let incomingDocsById = new Map();
+  let outgoingDocsById = new Map();
 
 // Seçime inline stil uygula (ör. font-size)
 // NOTE: Tek bir kez, IIFE içinde üst seviye scope’a ekleyin.
@@ -787,6 +788,140 @@ function applyInlineStyle(prop, val){
         'E-POSTA': member.email||'',
         'CEP TEL': member.phone||'',
       };
+
+      const CM_TO_PT = 28.346456692913385;
+      const shiftKeys = new Set(['kurum_adi','gorev_birim_adi','gorev_birim_adresi','adi','soyadi','tc','baba','ana','dogum_tarihi','dogum_yeri','kurum_sicil','unvan','sgk_sicil']);
+      const shiftLabels = new Set(['KURUMUN ADI','GÖREV YAPILAN BİRİMİN ADI','GÖREV YAPILAN BİRİMİN ADRESİ','ADI','SOYADI','TC KİMLİK NO','BABA ADI','ANA ADI','DOĞUM TARİHİ','DOĞUM YERİ','KURUM SİCİL','KADRO ÜNVANI','T.C.EMEKLİ SANDIĞI','SOSYAL SİGORTALAR KURUMU']);
+
+      const overlayValuesByKey = {
+        kurum_adi: values['KURUMUN ADI'],
+        gorev_birim_adi: values['GÖREV YAPILAN BİRİMİN ADI'],
+        gorev_birim_adresi: values['GÖREV YAPILAN BİRİMİN ADRESİ'],
+        adi: values['ADI'],
+        soyadi: values['SOYADI'],
+        tc: values['TC KİMLİK NO'],
+        baba: values['BABA ADI'],
+        ana: values['ANA ADI'],
+        dogum_tarihi: values['DOĞUM TARİHİ'],
+        dogum_yeri: values['DOĞUM YERİ'],
+        kurum_sicil: values['KURUM SİCİL'],
+        unvan: values['KADRO ÜNVANI'],
+        sgk_sicil: (member.retirement_no || member.ssk_no || '')
+      };
+
+      async function drawShiftedOverlay(){
+        try{
+          const pages = pdfDoc.getPages();
+          const page = pages[0];
+          const { width, height } = page.getSize();
+          const drawerFont = customFont || await pdfDoc.embedFont(StandardFonts.Helvetica);
+          const defaultCoords = {
+            kurum_adi:{x:0.32115696712360275,y:0.3054318129533846},
+            gorev_birim_adi:{x:0.3192376374534848,y:0.35759530361587766},
+            gorev_birim_adresi:{x:0.3192376374534848,y:0.38400000000000006},
+            adi:{x:0.3000443407523052,y:0.6010249532392351},
+            soyadi:{x:0.29812501108218714,y:0.6364961268897303},
+            tc:{x:0.2942863517419513,y:0.6858775676187977},
+            baba:{x:0.2962056814120692,y:0.7195404103920329},
+            ana:{x:0.726135527518494,y:0.7216269500185325},
+            dogum_tarihi:{x:0.2942863517419513,y:0.7612712029220272},
+            dogum_yeri:{x:0.7338128461989657,y:0.7612712029220272},
+            kurum_sicil:{x:0.3000443407523052,y:0.8669892212773691},
+            unvan:{x:0.3019636704224231,y:0.9042687175968724},
+            sgk_sicil:{x:0.2040778572464068,y:0.8452892059779652},
+            cinsiyet_erkek:{x:0.4977352967744557,y:0.1732843298067924},
+            cinsiyet_kadin:{x:0.8643272637669875,y:0.17537086943329214},
+            ogrenim_ilkogretim:{x:0.37489819788690587,y:0.21292858271028706},
+            ogrenim_lise:{x:0.5860244615998822,y:0.2150151223367868},
+            ogrenim_yuksekokul:{x:0.9161491648601727,y:0.2150151223367868}
+          };
+          const defaultStyles = {
+            kurum_adi:{dx:-0.006000000000000001,dy:-0.05500000000000001,size:9.5},
+            gorev_birim_adi:{dx:-0.003,dy:-0.07900000000000003,size:9.5},
+            gorev_birim_adresi:{dx:-0.003,dy:-0.07200000000000003,size:9.5},
+            adi:{dx:0.012,dy:-0.1780000000000001,size:9.5},
+            soyadi:{dx:0.012,dy:-0.19300000000000012,size:9.5},
+            tc:{dx:0.015,dy:-0.21700000000000014,size:9.5},
+            baba:{dx:0.015,dy:-0.22600000000000015,size:9.5},
+            ana:{dx:-0.018,dy:-0.22900000000000015,size:9.5},
+            dogum_tarihi:{dx:0.018,dy:-0.24700000000000016,size:9.5},
+            dogum_yeri:{dx:-0.026999999999999996,dy:-0.24700000000000016,size:9.5},
+            kurum_sicil:{dx:0.012,dy:-0.2890000000000002,size:9.5},
+            unvan:{dx:0.009000000000000001,dy:-0.3070000000000002,size:9.5},
+            sgk_sicil:{dx:0.24900000000000017,dy:-0.19300000000000012,size:9.5},
+            cinsiyet_erkek:{dx:-0.008999999999999994,dy:0.3630000000000002,size:10.5},
+            cinsiyet_kadin:{dx:-0.05400000000000001,dy:0.36000000000000026,size:10},
+            ogrenim_ilkogretim:{dx:0.003,dy:0.34500000000000025,size:10},
+            ogrenim_lise:{dx:-0.020999999999999998,dy:0.34200000000000025,size:10},
+            ogrenim_yuksekokul:{dx:-0.06000000000000002,dy:0.3420000000000002,size:10}
+          };
+          let coords = JSON.parse(JSON.stringify(defaultCoords));
+          try{ const raw = localStorage.getItem('ilkesen_pdf_coords_v1'); if (raw){ const m = JSON.parse(raw)||{}; Object.assign(coords, m); } }catch{}
+          let styles = JSON.parse(JSON.stringify(defaultStyles));
+          try{ const raw = localStorage.getItem('ilkesen_pdf_styles_v1'); if (raw){ const m = JSON.parse(raw)||{}; Object.assign(styles, m); } }catch{}
+
+          function drawTxt(key, text, sz){
+            const c = coords[key]; if (!c) return; const st = styles[key]||{};
+            const dx = Number.isFinite(st.dx) ? st.dx : 0; const dy = Number.isFinite(st.dy) ? st.dy : 0; const fs = Number.isFinite(st.size) ? st.size : (sz||10);
+            let tx = (c.x + dx) * width;
+            if (shiftKeys.has(key)) tx = tx - CM_TO_PT;
+            tx = Math.max(8, tx);
+            const ty = Math.max(8, height - ((c.y + dy) * height));
+            page.drawText(String(text||''), { x: tx, y: ty, size: fs, font: drawerFont });
+          }
+          function markX(key, sz){
+            const c = coords[key]; if (!c) return; const st = styles[key]||{};
+            const dx = Number.isFinite(st.dx) ? st.dx : 0; const dy = Number.isFinite(st.dy) ? st.dy : 0; const fs = Number.isFinite(st.size) ? st.size : (sz||12);
+            const tx = Math.max(6, (c.x + dx) * width);
+            const ty = Math.max(6, height - ((c.y + dy) * height));
+            page.drawText('X', { x: tx, y: ty, size: fs, font: drawerFont });
+          }
+
+          Object.entries(overlayValuesByKey).forEach(([k,v])=>{ try{ drawTxt(k, v); }catch{} });
+
+          let debugMarks = false; try{ debugMarks = localStorage.getItem('ilkesen_pdf_debug_marks_v1') === 'all'; }catch{}
+          if (debugMarks){
+            markX('cinsiyet_erkek'); markX('cinsiyet_kadin');
+            markX('ogrenim_ilkogretim'); markX('ogrenim_lise'); markX('ogrenim_yuksekokul');
+          } else {
+            let gk = '';
+            try{
+              const forceG = localStorage.getItem('ilkesen_pdf_force_gender_v1');
+              if (forceG==='erkek') gk = 'cinsiyet_erkek';
+              else if (forceG==='kadin') gk = 'cinsiyet_kadin';
+              else if (forceG==='none') gk = '';
+            }catch{}
+            if (!gk){
+              const g = String(member.gender||'').toLowerCase();
+              if (g.includes('erk') || g==='male') gk = 'cinsiyet_erkek';
+              else if (g.includes('kad') || g==='female') gk = 'cinsiyet_kadin';
+            }
+            if (gk) markX(gk);
+
+            function eduKey(v){
+              const s = String(v||'').toLowerCase();
+              if (!s) return '';
+              if (s.includes('ilkö') || s.includes('ilko') || s.includes('ilkokul') || s.includes('ortaokul') || s.includes('ortaok') || s.includes('primary') || s.includes('middle')) return 'ogrenim_ilkogretim';
+              if (s.includes('lise') || s.includes('ortaöğ') || s.includes('ortaog') || s.includes('high')) return 'ogrenim_lise';
+              if (s.includes('yüksek') || s.includes('yuksek') || s.includes('univers') || s.includes('ünivers') || s.includes('uni') || s.includes('yuksekokul') || s.includes('yüksekokul') || s.includes('lisans') || s.includes('onlisans') || s.includes('önlisans') || s.includes('doktora') || s.includes('doctor')) return 'ogrenim_yuksekokul';
+              const only = s.replace(/[^0-9]/g,'');
+              if (only==='1') return 'ogrenim_ilkogretim';
+              if (only==='2') return 'ogrenim_lise';
+              if (only==='3') return 'ogrenim_yuksekokul';
+              return '';
+            }
+            let ek = '';
+            try{
+              const force = localStorage.getItem('ilkesen_pdf_force_edu_v1');
+              if (force==='ilkogretim') ek = 'ogrenim_ilkogretim';
+              else if (force==='lise') ek = 'ogrenim_lise';
+              else if (force==='yuksekokul') ek = 'ogrenim_yuksekokul';
+            }catch{}
+            if (!ek){ ek = eduKey(member.education); }
+            if (ek) markX(ek);
+          }
+        }catch{}
+      }
       // Load template with fallbacks for non-ascii filename encodings
       async function fetchTpl(){
         const urls = ['assets/üyelik.pdf', 'assets/%C3%BCyelik.pdf', 'assets/uyelik.pdf'];
@@ -822,7 +957,7 @@ function applyInlineStyle(prop, val){
         if (hit){ try{ form.getTextField(hit.name).setText(v); return true; }catch{} }
         return false;
       }
-      Object.entries(values).forEach(([k,v])=>{ try{ setFieldSmart(k, v); }catch{} });
+      Object.entries(values).forEach(([k,v])=>{ try{ if (!shiftLabels.has(k)) setFieldSmart(k, v); }catch{} });
       try{
         if (!customFont){
           try{ await ensureFontkit(); }catch{}
@@ -832,6 +967,7 @@ function applyInlineStyle(prop, val){
         else { const helv = await pdfDoc.embedFont(StandardFonts.Helvetica); form.updateFieldAppearances(helv); }
       }catch{}
       try{ form.flatten(); }catch{}
+      try{ if (fields && fields.length){ await drawShiftedOverlay(); } }catch{}
       // Fallback for non-form template: use coordinate map (with calibration support)
       try{
         const noFields = !form || (form.getFields && form.getFields().length === 0);
@@ -855,7 +991,9 @@ function applyInlineStyle(prop, val){
           function drawTxt(key, text, sz){
             const c = coords[key]; if (!c) return; const st = styles[key]||{};
             const dx = Number.isFinite(st.dx) ? st.dx : 0; const dy = Number.isFinite(st.dy) ? st.dy : 0; const fs = Number.isFinite(st.size) ? st.size : (sz||10);
-            const tx = Math.max(8, (c.x + dx) * width);
+            let tx = (c.x + dx) * width;
+            if (shiftKeys.has(key)) tx = tx - CM_TO_PT;
+            tx = Math.max(8, tx);
             const ty = Math.max(8, height - ((c.y + dy) * height));
             page.drawText(String(text||''), { x: tx, y: ty, size: fs, font: drawerFont });
           }
@@ -2209,9 +2347,13 @@ await loadAdminMembers();
 const qrSize = 160;
 const padBR = 28;
 const cb = Date.now() + '-' + encodeURIComponent(member.verify_token || member.id); // cache-buster
-const qr = await loadImg(`https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&margin=0&data=${encodeURIComponent(url)}&cb=${cb}`);
 const qx = padBR, qy = canvas.height - padBR - qrSize;
-ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
+let qr = null;
+try{ qr = await loadImg(`https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&margin=0&data=${encodeURIComponent(url)}&cb=${cb}`); }catch{}
+if (!qr){
+  try{ qr = await loadImg(`https://chart.googleapis.com/chart?cht=qr&chs=${qrSize}x${qrSize}&chld=L|0&chl=${encodeURIComponent(url)}&cb=${cb}`); }catch{}
+}
+if (qr) ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         } else {
           // template coordinates
           ctx.textAlign='left'; let leftX=Math.floor(canvas.width/2), lineY=808-52; // başlangıç: merkeze hizala, 2 satır yukarı
@@ -2236,9 +2378,13 @@ ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
 const qrSize = 160;
 const padBR = 28;
 const cb = Date.now() + '-' + encodeURIComponent(member.verify_token || member.id); // cache-buster
-const qr = await loadImg(`https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&margin=0&data=${encodeURIComponent(url)}&cb=${cb}`);
 const qx = padBR, qy = canvas.height - padBR - qrSize;
-ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
+let qr = null;
+try{ qr = await loadImg(`https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&margin=0&data=${encodeURIComponent(url)}&cb=${cb}`); }catch{}
+if (!qr){
+  try{ qr = await loadImg(`https://chart.googleapis.com/chart?cht=qr&chs=${qrSize}x${qrSize}&chld=L|0&chl=${encodeURIComponent(url)}&cb=${cb}`); }catch{}
+}
+if (qr) ctx.drawImage(qr, qx, qy, qrSize, qrSize);}catch{}
         }
         // finalize snapshot
         try{ window.__idcardLastPng = canvas.toDataURL('image/jpeg', 0.92); }catch{}
@@ -4135,7 +4281,7 @@ function openReportModal(row){
           currentDocsSubTab = 'incoming';
           try{ incBtn.className = 'btn btn-success'; }catch{}
           try{ if (outBtn) outBtn.className = 'btn btn-outline'; }catch{}
-          if (newBtn) newBtn.style.display = '';
+          if (newBtn){ newBtn.style.display = ''; newBtn.textContent = 'Evrak Kaydet'; }
           loadAdminIncomingDocs();
         });
       }
@@ -4146,29 +4292,40 @@ function openReportModal(row){
           currentDocsSubTab = 'outgoing';
           try{ outBtn.className = 'btn btn-success'; }catch{}
           try{ if (incBtn) incBtn.className = 'btn btn-outline'; }catch{}
-          if (newBtn) newBtn.style.display = 'none';
-          // Outgoing UI will be implemented later
-          const tbody = document.getElementById('incomingDocsTableBody');
-          if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="muted">Giden Evrak yakında eklenecek.</td></tr>';
+          if (newBtn){ newBtn.style.display = ''; newBtn.textContent = 'Evrak Oluştur'; }
+          loadAdminOutgoingDocs();
         });
       }
       if (newBtn && !newBtn.dataset.wired){
         newBtn.dataset.wired='1';
-        newBtn.addEventListener('click', async (e)=>{ e.preventDefault(); await openIncomingDocModal(null); });
+        newBtn.addEventListener('click', async (e)=>{
+          e.preventDefault();
+          if (currentDocsSubTab === 'outgoing') await openOutgoingDocModal(null);
+          else await openIncomingDocModal(null);
+        });
       }
 
       // Default load and style
       if (currentDocsSubTab !== 'outgoing'){
         if (incBtn) incBtn.className = 'btn btn-success';
         if (outBtn) outBtn.className = 'btn btn-outline';
-        if (newBtn) newBtn.style.display = '';
+        if (newBtn){ newBtn.style.display = ''; newBtn.textContent = 'Evrak Kaydet'; }
         await loadAdminIncomingDocs();
       } else {
         if (incBtn) incBtn.className = 'btn btn-outline';
         if (outBtn) outBtn.className = 'btn btn-success';
-        if (newBtn) newBtn.style.display = 'none';
+        if (newBtn){ newBtn.style.display = ''; newBtn.textContent = 'Evrak Oluştur'; }
+        await loadAdminOutgoingDocs();
       }
     }catch(e){ alert('Evrak Modülü yüklenemedi: ' + (e?.message||String(e))); }
+  }
+
+  function localISODate(d){
+    try{
+      const dt = d ? new Date(d) : new Date();
+      const tz = dt.getTimezoneOffset() * 60000;
+      return new Date(dt.getTime() - tz).toISOString().slice(0,10);
+    }catch{ return new Date().toISOString().slice(0,10); }
   }
 
   async function loadAdminIncomingDocs(){
@@ -4217,6 +4374,52 @@ function openReportModal(row){
         });
       }catch{}
     }catch(e){ alert('Gelen evraklar yüklenemedi: ' + (e?.message||String(e))); }
+  }
+
+  async function loadAdminOutgoingDocs(){
+    const tbody = document.getElementById('incomingDocsTableBody'); if (!tbody) return; tbody.innerHTML = '';
+    try{
+      const table = tbody.closest('table');
+      const headRow = table && table.tHead && table.tHead.rows && table.tHead.rows[0];
+      if (headRow){
+        headRow.innerHTML = '<th>Kayıt Sıra No</th><th>Gönderildiği Kişi/Kurum</th><th>Tarihi</th><th>Eki</th><th>Konusu</th><th>Muhafaza Dosya No</th><th>Dosya</th>';
+      }
+    }catch{}
+    try{
+      const { data, error } = await sb().from('outgoing_docs')
+        .select('id, record_no, to_org, date, attachment, subject, file_no, file_url, created_at')
+        .order('date', { ascending:false, nullsFirst:true })
+        .order('created_at', { ascending:false, nullsFirst:true });
+      if (error) throw error;
+      outgoingDocsById.clear();
+      (data||[]).forEach(row => {
+        outgoingDocsById.set(String(row.id), row);
+        const tr = document.createElement('tr');
+        const fileLink = row.file_url
+          ? `<a href="#" data-preview-url="${escapeHtml(row.file_url)}" aria-label="Önizleme" title="Önizleme" style="display:inline-flex;align-items:center;gap:4px;">
+               <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                 <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path>
+                 <circle cx="12" cy="12" r="3"></circle>
+               </svg>
+             </a>`
+          : '-';
+        tr.innerHTML = `
+          <td>${escapeHtml(row.record_no||'')}</td>
+          <td>${escapeHtml(row.to_org||'')}</td>
+          <td>${row.date ? new Date(row.date).toLocaleDateString('tr-TR') : '-'}</td>
+          <td>${escapeHtml(row.attachment||'')}</td>
+          <td>${escapeHtml(row.subject||'')}</td>
+          <td>${escapeHtml(row.file_no||'')}</td>
+          <td>${fileLink}</td>`;
+        tbody.appendChild(tr);
+      });
+      try{
+        tbody.querySelectorAll('a[data-preview-url]').forEach(a => {
+          if (a.dataset.wired) return; a.dataset.wired='1';
+          a.addEventListener('click', (e)=>{ e.preventDefault(); const u=a.getAttribute('data-preview-url'); if (u) openDocPreviewModal(u); });
+        });
+      }catch{}
+    }catch(e){ alert('Giden evraklar yüklenemedi: ' + (e?.message||String(e))); }
   }
 
   function wireIncomingDocsRowActions(){
@@ -4357,6 +4560,30 @@ function openReportModal(row){
     }catch{ return `${new Date().getFullYear()}/001`; }
   }
 
+  async function generateNextOutgoingRecordNo(){
+    try{
+      const year = new Date().getFullYear();
+      const prefix = `${year}/`;
+      const { data } = await sb().from('outgoing_docs')
+        .select('record_no')
+        .ilike('record_no', `${prefix}%`)
+        .order('record_no', { ascending:false })
+        .limit(1000);
+      let maxSeq = 0;
+      (data||[]).forEach(r => {
+        const s = String(r.record_no||'');
+        if (s.startsWith(prefix)){
+          const tail = s.slice(prefix.length).replace(/[^0-9]/g,'');
+          const n = parseInt(tail||'0',10);
+          if (!isNaN(n) && n > maxSeq) maxSeq = n;
+        }
+      });
+      const next = maxSeq + 1;
+      const pad = String(next).padStart(3,'0');
+      return `${prefix}${pad}`;
+    }catch{ return `${new Date().getFullYear()}/001`; }
+  }
+
   async function openIncomingDocModal(row){
     try{
       row = row || null;
@@ -4369,12 +4596,12 @@ function openReportModal(row){
       const recIn = document.createElement('input'); recIn.readOnly = true; recIn.disabled = true; recIn.value = row?.record_no || '';
       recLbl.appendChild(recIn); form.appendChild(recLbl);
 
-      const fromLbl = document.createElement('label'); fromLbl.style.display='grid'; fromLbl.style.gap='6px'; fromLbl.innerHTML = '<span>Geldiği Kişi veya Kurum</span>';
-      const fromIn = document.createElement('input'); fromIn.value = row?.from_org || '';
+      const fromLbl = document.createElement('label'); fromLbl.style.display='grid'; fromLbl.style.gap='6px'; fromLbl.innerHTML = '<span>Geldiği Kişi/Kurum</span>';
+      const fromIn = document.createElement('textarea'); fromIn.rows = 2; fromIn.value = row?.from_org || '';
       fromLbl.appendChild(fromIn); form.appendChild(fromLbl);
 
       const dateLbl = document.createElement('label'); dateLbl.style.display='grid'; dateLbl.style.gap='6px'; dateLbl.innerHTML = '<span>Tarihi</span>';
-      const dateIn = document.createElement('input'); dateIn.type='date'; dateIn.value = row?.date ? String(row.date).slice(0,10) : '';
+      const dateIn = document.createElement('input'); dateIn.type='date'; dateIn.value = row?.date ? String(row.date).slice(0,10) : localISODate();
       dateLbl.appendChild(dateIn); form.appendChild(dateLbl);
 
       const numLbl = document.createElement('label'); numLbl.style.display='grid'; numLbl.style.gap='6px'; numLbl.innerHTML = '<span>Sayısı</span>';
@@ -4440,6 +4667,88 @@ function openReportModal(row){
           else { q = sb().from('incoming_docs').insert(payload).select('id, record_no').single(); }
           const { data, error } = await q; if (error) throw error;
           closeModal(); await loadAdminIncomingDocs();
+        }catch(err){ alert('Kaydedilemedi: ' + (err?.message||String(err))); }
+      });
+
+      (typeof openModal === 'function' ? openModal() : (window.openModal && window.openModal()));
+    }catch(e){ alert('Evrak formu açılamadı: ' + (e?.message||String(e))); }
+  }
+
+  async function openOutgoingDocModal(row){
+    try{
+      row = row || null;
+      const isEdit = !!(row && row.id);
+      $modalTitle().textContent = isEdit ? 'Giden Evrak Düzenle' : 'Yeni Giden Evrak';
+      const form = $modalForm(); form.innerHTML='';
+
+      const recLbl = document.createElement('label'); recLbl.style.display='grid'; recLbl.style.gap='6px'; recLbl.innerHTML = '<span>Kayıt Sıra No</span>';
+      const recIn = document.createElement('input'); recIn.readOnly = true; recIn.disabled = true; recIn.value = row?.record_no || '';
+      recLbl.appendChild(recIn); form.appendChild(recLbl);
+
+      const toLbl = document.createElement('label'); toLbl.style.display='grid'; toLbl.style.gap='6px'; toLbl.innerHTML = '<span>Gönderildiği Kişi/Kurum</span>';
+      const toIn = document.createElement('textarea'); toIn.rows = 2; toIn.value = row?.to_org || '';
+      toLbl.appendChild(toIn); form.appendChild(toLbl);
+
+      const dateLbl = document.createElement('label'); dateLbl.style.display='grid'; dateLbl.style.gap='6px'; dateLbl.innerHTML = '<span>Tarihi</span>';
+      const dateIn = document.createElement('input'); dateIn.type='date'; dateIn.value = row?.date ? String(row.date).slice(0,10) : localISODate();
+      dateLbl.appendChild(dateIn); form.appendChild(dateLbl);
+
+      const attLbl = document.createElement('label'); attLbl.style.display='grid'; attLbl.style.gap='6px'; attLbl.innerHTML = '<span>Eki</span>';
+      const attIn = document.createElement('input'); attIn.value = row?.attachment || '';
+      attLbl.appendChild(attIn); form.appendChild(attLbl);
+
+      const subLbl = document.createElement('label'); subLbl.style.display='grid'; subLbl.style.gap='6px'; subLbl.innerHTML = '<span>Konusu</span>';
+      const subIn = document.createElement('input'); subIn.value = row?.subject || '';
+      subLbl.appendChild(subIn); form.appendChild(subLbl);
+
+      const fileNoLbl = document.createElement('label'); fileNoLbl.style.display='grid'; fileNoLbl.style.gap='6px'; fileNoLbl.innerHTML = '<span>Muhafaz Edildiği Dosya No</span>';
+      const fileNoIn = document.createElement('input'); fileNoIn.value = row?.file_no || '';
+      fileNoLbl.appendChild(fileNoIn); form.appendChild(fileNoLbl);
+
+      const fileLbl = document.createElement('label'); fileLbl.style.display='grid'; fileLbl.style.gap='6px'; fileLbl.innerHTML = '<span>Dosya Ekle</span>';
+      const fileUrlIn = document.createElement('input'); fileUrlIn.placeholder='https://...'; fileUrlIn.value = row?.file_url || '';
+      const fileFile = document.createElement('input'); fileFile.type='file'; fileFile.accept='application/pdf,image/*,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.rtf';
+      const fileWrap = document.createElement('div'); fileWrap.style.display='grid'; fileWrap.style.gap='6px'; fileWrap.appendChild(fileUrlIn); fileWrap.appendChild(fileFile);
+      fileLbl.appendChild(fileWrap); form.appendChild(fileLbl);
+
+      const actions = document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
+      const saveBtn = document.createElement('button'); saveBtn.className='btn btn-success'; saveBtn.textContent='Kaydet';
+      const cancelBtn = document.createElement('button'); cancelBtn.className='btn btn-danger'; cancelBtn.textContent='İptal';
+      actions.appendChild(saveBtn); actions.appendChild(cancelBtn); form.appendChild(actions);
+
+      cancelBtn.addEventListener('click', (e)=>{ e.preventDefault(); closeModal(); });
+
+      if (!isEdit){
+        try{ recIn.value = await generateNextOutgoingRecordNo(); }catch{ recIn.value = `${new Date().getFullYear()}/001`; }
+      }
+
+      saveBtn.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        try{
+          const record_no = String(recIn.value||'').trim();
+          if (!record_no) return alert('Kayıt Sıra No üretilemedi');
+          const to_org = String(toIn.value||'').trim();
+          const date = dateIn.value ? new Date(dateIn.value).toISOString().slice(0,10) : null;
+          const attachment = String(attIn.value||'').trim();
+          const subject = String(subIn.value||'').trim();
+          const file_no = String(fileNoIn.value||'').trim();
+          let file_url = String(fileUrlIn.value||'').trim();
+
+          const f = fileFile.files && fileFile.files[0];
+          if (f){
+            const ext = (f.name.split('.').pop()||'pdf').toLowerCase();
+            const safeKey = record_no.replace(/\//g,'_');
+            const key = `outgoing/${new Date().getFullYear()}/${safeKey}_${Date.now()}.${ext}`;
+            try{ file_url = await uploadToBucketGeneric(f, 'docs', key); }
+            catch(err){ return alert('Dosya yüklenemedi: ' + (err?.message||String(err))); }
+          }
+
+          const payload = { record_no, to_org, date, attachment, subject, file_no, file_url };
+          let q;
+          if (isEdit){ q = sb().from('outgoing_docs').update(payload).eq('id', row.id); }
+          else { q = sb().from('outgoing_docs').insert(payload).select('id, record_no').single(); }
+          const { error } = await q; if (error) throw error;
+          closeModal(); await loadAdminOutgoingDocs();
         }catch(err){ alert('Kaydedilemedi: ' + (err?.message||String(err))); }
       });
 
